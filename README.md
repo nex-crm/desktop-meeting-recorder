@@ -1,11 +1,17 @@
-# Muesli
+# Nex Desktop Meeting Recorder
 
-This is a demo application that shows off what you can build with the [Recall.ai Desktop Recording SDK.](https://www.recall.ai/product/desktop-recording-sdk)
+A desktop application for recording meetings locally using the Recall.ai Desktop SDK. This provides a discreet, universal solution for meeting recording that works across all meeting platforms.
 
-This repo is intended to be a mockup of the kind of experience you can build using the Desktop Recording SDK. If you just want a minimal, easily-runnable example to use as a template for your project, or just want to see the bare minimum Desktop Recording SDK integration, check out one of the other sample applications:
+## Overview
 
-* https://github.com/recallai/desktop-sdk-electron-vite-sample
-* https://github.com/recallai/desktop-sdk-electron-webpack-sample
+This desktop recorder complements the Nex CRM meeting bot by:
+- Recording meetings discreetly without visible bot participation
+- Working with any meeting application (Zoom, Teams, Google Meet, etc.)
+- Capturing screen content and audio directly from the user's machine
+- Providing real-time transcription via Deepgram
+- Generating AI-powered summaries and insights
+
+Based on the [Recall.ai Desktop Recording SDK](https://www.recall.ai/product/desktop-recording-sdk) and forked from [muesli-public](https://github.com/recallai/muesli-public).
 
 # Setup
 

@@ -1,8 +1,8 @@
 {
-  "name": "muesli",
-  "productName": "Muesli",
-  "version": "1.0.0",
-  "description": "Muesli meeting recorder",
+  "name": "desktop-meeting-recorder",
+  "productName": "Nex Desktop Meeting Recorder",
+  "version": "0.1.0",
+  "description": "Nex CRM desktop meeting recorder using Recall.ai SDK",
   "main": ".webpack/main",
   "scripts": {
     "start": "electron-forge start",
@@ -11,10 +11,10 @@
     "publish": "electron-forge publish",
     "lint": "echo \"No linting configured\""
   },
-  "keywords": [],
+  "keywords": ["meeting", "recorder", "recall", "nex", "crm"],
   "author": {
-    "name": "Nick Faro",
-    "email": "yux50000@hotmail.com"
+    "name": "Nex",
+    "email": "contact@nex.ai"
   },
   "license": "MIT",
   "devDependencies": {
