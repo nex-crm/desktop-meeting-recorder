@@ -33,5 +33,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onParticipantsUpdated: (callback) => ipcRenderer.on('participants-updated', (_, meetingId) => callback(meetingId)),
   onVideoFrame: (callback) => ipcRenderer.on('video-frame', (_, data) => callback(data)),
   onMeetingDetectionStatus: (callback) => ipcRenderer.on('meeting-detection-status', (_, data) => callback(data)),
-  getActiveRecordingId: (noteId) => ipcRenderer.invoke('getActiveRecordingId', noteId)
+  getActiveRecordingId: (noteId) => ipcRenderer.invoke('getActiveRecordingId', noteId),
+
+  // Authentication APIs
+  auth: {
+    login: () => ipcRenderer.invoke('auth:login'),
+    logout: () => ipcRenderer.invoke('auth:logout'),
+    getUser: () => ipcRenderer.invoke('auth:getUser'),
+    getWorkspace: () => ipcRenderer.invoke('auth:getWorkspace'),
+    isAuthenticated: () => ipcRenderer.invoke('auth:isAuthenticated'),
+    onAuthSuccess: (callback) => ipcRenderer.on('auth:success', callback),
+    onAuthLogout: (callback) => ipcRenderer.on('auth:logout', callback),
+  },
+
+  // Calendar APIs
+  calendar: {
+    getUpcomingMeetings: (hours) => ipcRenderer.invoke('calendar:getUpcomingMeetings', hours),
+    getMeetingDetails: (eventId) => ipcRenderer.invoke('calendar:getMeetingDetails', eventId),
+  }
 });

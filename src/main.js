@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, protocol, Notification } = require('electron');
+const { app, BrowserWindow, ipcMain, protocol, Notification, dialog } = require('electron');
 const path = require('node:path');
 const url = require('url');
 const fs = require('fs');
@@ -7,6 +7,14 @@ const axios = require('axios');
 const OpenAI = require('openai');
 const sdkLogger = require('./sdk-logger');
 require('dotenv').config();
+
+// Import Nex services
+const NexAuthService = require('./services/auth');
+const NexApiService = require('./services/api');
+
+// Initialize services
+let authService;
+let apiService;
 
 // Function to get the OpenRouter headers
 function getHeaderLines() {
@@ -91,7 +99,7 @@ const createWindow = () => {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   console.log("Registering IPC handlers...");
   // Log all registered IPC handlers
   console.log("IPC handlers:", Object.keys(ipcMain._invokeHandlers));
@@ -120,7 +128,70 @@ app.whenReady().then(() => {
     console.error("Couldn't create the recording path:", e);
   }
 
-  // Initialize the Recall.ai SDK
+  // Initialize authentication service
+  authService = new NexAuthService();
+  apiService = new NexApiService(authService);
+
+  // Set up auth event listeners
+  authService.on('auth:success', () => {
+    console.log('Authentication successful');
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('auth:success');
+    }
+  });
+
+  authService.on('auth:logout', () => {
+    console.log('User logged out');
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('auth:logout');
+    }
+  });
+
+  // Check authentication status
+  const isAuthenticated = authService.isAuthenticated();
+
+  if (!isAuthenticated) {
+    // Show login dialog
+    const result = await dialog.showMessageBox({
+      type: 'info',
+      title: 'Authentication Required',
+      message: 'Please log in to Nex to use the Desktop Meeting Recorder',
+      buttons: ['Login', 'Cancel'],
+      defaultId: 0,
+      cancelId: 1
+    });
+
+    if (result.response === 0) {
+      try {
+        await authService.login();
+        console.log('Login successful');
+      } catch (error) {
+        console.error('Login failed:', error);
+        dialog.showErrorBox('Authentication Failed', 'Failed to authenticate. The app will now exit.');
+        app.quit();
+        return;
+      }
+    } else {
+      app.quit();
+      return;
+    }
+  } else {
+    // Validate existing session
+    const validation = await authService.validateSession();
+    if (!validation.isValid) {
+      console.log('Session invalid, re-authenticating...');
+      try {
+        await authService.login();
+      } catch (error) {
+        console.error('Re-authentication failed:', error);
+        dialog.showErrorBox('Authentication Failed', 'Failed to authenticate. The app will now exit.');
+        app.quit();
+        return;
+      }
+    }
+  }
+
+  // Initialize the Recall.ai SDK only after authentication
   initSDK();
 
   createWindow();
@@ -1053,6 +1124,71 @@ ipcMain.handle('loadMeetingsData', async () => {
     };
   } catch (error) {
     console.error('Failed to load meetings data:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Authentication IPC handlers
+ipcMain.handle('auth:login', async () => {
+  try {
+    await authService.login();
+    const user = authService.getUser();
+    return { success: true, user };
+  } catch (error) {
+    console.error('Login failed:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('auth:logout', async () => {
+  try {
+    await authService.logout();
+    return { success: true };
+  } catch (error) {
+    console.error('Logout failed:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('auth:getUser', async () => {
+  try {
+    const user = authService.getUser();
+    return { success: true, user };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('auth:getWorkspace', async () => {
+  try {
+    const workspace = authService.getWorkspace();
+    return { success: true, workspace };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('auth:isAuthenticated', async () => {
+  return authService.isAuthenticated();
+});
+
+// Calendar IPC handlers
+ipcMain.handle('calendar:getUpcomingMeetings', async (event, hours) => {
+  try {
+    const meetings = await apiService.getUpcomingMeetings(hours);
+    return { success: true, meetings };
+  } catch (error) {
+    console.error('Failed to fetch upcoming meetings:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('calendar:getMeetingDetails', async (event, eventId) => {
+  try {
+    const meeting = await apiService.getMeetingDetails(eventId);
+    return { success: true, meeting };
+  } catch (error) {
+    console.error('Failed to fetch meeting details:', error);
     return { success: false, error: error.message };
   }
 });
