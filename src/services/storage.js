@@ -88,10 +88,12 @@ class SecureStorage {
 
   setUser(user) {
     this.store.set('user', {
-      id: user.id,
+      id: user.id || user.user_id || user.userId,
       email: user.email,
-      name: user.name,
-      workspaceId: user.workspaceId,
+      // Use full_name from the API response (protobuf field)
+      name: user.full_name || user.fullName || user.name,
+      full_name: user.full_name || user.fullName || user.name,
+      workspaceId: user.workspaceId || user.workspace_id,
       updatedAt: Date.now(),
     });
   }

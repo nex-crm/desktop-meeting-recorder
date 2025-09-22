@@ -2000,4 +2000,98 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  // Check authentication status and display user info
+  async function updateAuthStatus() {
+    try {
+      const isAuthenticated = await window.electronAPI.auth.isAuthenticated();
+      console.log('Authentication status:', isAuthenticated);
+
+      if (isAuthenticated) {
+        const userResult = await window.electronAPI.auth.getUser();
+        console.log('User data:', userResult);
+
+        if (userResult.success && userResult.user) {
+          // The user data might be in userResult.user.data.user structure from the API response
+          const userData = userResult.user?.data?.user || userResult.user?.user || userResult.user?.data || userResult.user;
+          console.log('Extracted user data:', userData);
+          console.log('User data type:', typeof userData);
+          console.log('User data keys:', userData ? Object.keys(userData) : 'no keys');
+
+          const avatarElement = document.querySelector('.user-avatar');
+
+          if (avatarElement) {
+            // Handle both camelCase and snake_case field names from protobuf
+            // The protobuf uses full_name (snake_case)
+            // The storage now properly saves full_name from the API
+            const email = userData.email || '';
+            const fullName = (userData.full_name || userData.name || userData.fullName || '').trim();
+
+            // Log to debug what we're getting
+            console.log('User full_name:', userData.full_name);
+            console.log('User fullName:', userData.fullName);
+            console.log('User name:', userData.name);
+            console.log('User email:', userData.email);
+            console.log('Extracted fullName:', fullName);
+
+            // Make sure fullName is not accidentally set to email
+            const actualName = (fullName && fullName !== email) ? fullName : '';
+
+            // Update avatar with user initials or image
+            const initials = actualName ?
+              actualName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) :
+              email ? email[0].toUpperCase() : 'U';
+
+            // Create a better avatar display with initials
+            avatarElement.innerHTML = `
+              <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: 500; font-size: 14px; cursor: pointer;" title="${email || 'User'}">
+                ${initials}
+              </div>
+            `;
+
+            // Add click handler to show user info
+            avatarElement.onclick = () => {
+              const displayName = actualName || email || 'Unknown User';
+              const displayEmail = email || 'No email';
+              alert(`Logged in as:\nName: ${displayName}\nEmail: ${displayEmail}`);
+            };
+          }
+        }
+      } else {
+        // Show not authenticated state
+        const avatarElement = document.querySelector('.user-avatar');
+        if (avatarElement) {
+          avatarElement.innerHTML = `
+            <div style="width: 32px; height: 32px; border-radius: 50%; background: #f0f0f0; display: flex; align-items: center; justify-content: center; cursor: pointer;" title="Not logged in">
+              <svg width="20" height="20" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M20 20C22.7614 20 25 17.7614 25 15C25 12.2386 22.7614 10 20 10C17.2386 10 15 12.2386 15 15C15 17.7614 17.2386 20 20 20Z" fill="#a0a0a0"/>
+                <path d="M12 31C12 26.0294 15.5817 22 20 22C24.4183 22 28 26.0294 28 31" stroke="#a0a0a0" stroke-width="4"/>
+              </svg>
+            </div>
+          `;
+
+          avatarElement.onclick = async () => {
+            if (confirm('You are not logged in. Would you like to log in now?')) {
+              await window.electronAPI.auth.login();
+            }
+          };
+        }
+      }
+    } catch (error) {
+      console.error('Error checking auth status:', error);
+    }
+  }
+
+  // Check auth status on load
+  updateAuthStatus();
+
+  // Listen for auth events
+  window.electronAPI.auth.onAuthSuccess(() => {
+    console.log('Auth success event received');
+    updateAuthStatus();
+  });
+
+  window.electronAPI.auth.onAuthLogout(() => {
+    console.log('Auth logout event received');
+    updateAuthStatus();
+  });
 });

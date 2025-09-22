@@ -12,8 +12,8 @@ require('dotenv').config();
 const NexAuthService = require('./services/auth');
 const NexApiService = require('./services/api');
 
-// Initialize services
-let authService;
+// Initialize services immediately
+const authService = new NexAuthService();
 let apiService;
 
 // Function to get the OpenRouter headers
@@ -97,6 +97,50 @@ const createWindow = () => {
 };
 
 // This method will be called when Electron has finished
+// Register protocol handler for nex://
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient('nex', process.execPath, [path.resolve(process.argv[1])]);
+  }
+} else {
+  app.setAsDefaultProtocolClient('nex');
+}
+
+// Handle protocol on Windows/Linux
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    // Someone tried to run a second instance, we should focus our window instead
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+
+    // Handle protocol URL
+    const url = commandLine.find(arg => arg.startsWith('nex://'));
+    if (url && authService) {
+      authService.handleAuthCallback(url);
+    }
+  });
+}
+
+// Handle protocol on macOS
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  console.log('Received protocol URL:', url);
+  if (url.startsWith('nex://')) {
+    if (authService) {
+      console.log('Handling auth callback...');
+      authService.handleAuthCallback(url);
+    } else {
+      console.error('AuthService not initialized yet');
+    }
+  }
+});
+
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(async () => {
@@ -128,8 +172,7 @@ app.whenReady().then(async () => {
     console.error("Couldn't create the recording path:", e);
   }
 
-  // Initialize authentication service
-  authService = new NexAuthService();
+  // Initialize API service
   apiService = new NexApiService(authService);
 
   // Set up auth event listeners
@@ -147,12 +190,15 @@ app.whenReady().then(async () => {
     }
   });
 
+  // Create the main window first so it can handle protocol callbacks
+  createWindow();
+
   // Check authentication status
   const isAuthenticated = authService.isAuthenticated();
 
   if (!isAuthenticated) {
     // Show login dialog
-    const result = await dialog.showMessageBox({
+    const result = await dialog.showMessageBox(mainWindow, {
       type: 'info',
       title: 'Authentication Required',
       message: 'Please log in to Nex to use the Desktop Meeting Recorder',
@@ -165,6 +211,8 @@ app.whenReady().then(async () => {
       try {
         await authService.login();
         console.log('Login successful');
+        // Initialize SDK after successful login
+        initSDK();
       } catch (error) {
         console.error('Login failed:', error);
         dialog.showErrorBox('Authentication Failed', 'Failed to authenticate. The app will now exit.');
@@ -176,25 +224,70 @@ app.whenReady().then(async () => {
       return;
     }
   } else {
-    // Validate existing session
+    // We have tokens, but let's validate the session and check for user data
+    console.log('Validating existing session...');
     const validation = await authService.validateSession();
+
     if (!validation.isValid) {
-      console.log('Session invalid, re-authenticating...');
-      try {
-        await authService.login();
-      } catch (error) {
-        console.error('Re-authentication failed:', error);
-        dialog.showErrorBox('Authentication Failed', 'Failed to authenticate. The app will now exit.');
-        app.quit();
-        return;
+      console.log('Session validation failed:', validation.reason);
+
+      // Check if it's specifically because of missing user data
+      if (validation.reason.includes('user data')) {
+        const result = await dialog.showMessageBox(mainWindow, {
+          type: 'warning',
+          title: 'Re-authentication Required',
+          message: 'Your user profile could not be loaded. Please log in again to refresh your session.',
+          buttons: ['Re-authenticate', 'Cancel'],
+          defaultId: 0,
+          cancelId: 1
+        });
+
+        if (result.response === 0) {
+          try {
+            await authService.login();
+            console.log('Re-authentication successful');
+          } catch (error) {
+            console.error('Re-authentication failed:', error);
+            dialog.showErrorBox('Authentication Failed', 'Failed to re-authenticate. The app will now exit.');
+            app.quit();
+            return;
+          }
+        } else {
+          app.quit();
+          return;
+        }
+      } else {
+        // Generic session invalid dialog
+        const result = await dialog.showMessageBox(mainWindow, {
+          type: 'info',
+          title: 'Session Expired',
+          message: 'Your session has expired. Please log in again to continue.',
+          buttons: ['Login', 'Cancel'],
+          defaultId: 0,
+          cancelId: 1
+        });
+
+        if (result.response === 0) {
+          try {
+            await authService.login();
+            console.log('Re-authentication successful');
+          } catch (error) {
+            console.error('Re-authentication failed:', error);
+            dialog.showErrorBox('Authentication Failed', 'Failed to authenticate. The app will now exit.');
+            app.quit();
+            return;
+          }
+        } else {
+          app.quit();
+          return;
+        }
       }
+    } else {
+      console.log('Session is valid');
+      // Initialize SDK for valid session
+      initSDK();
     }
   }
-
-  // Initialize the Recall.ai SDK only after authentication
-  initSDK();
-
-  createWindow();
 
   // When the window is ready, send the initial meeting detection status
   mainWindow.webContents.on('did-finish-load', () => {
@@ -473,9 +566,50 @@ function initSDK() {
     }
   });
 
+  // Helper function to handle meeting detection
+  const handleMeetingDetected = (evt) => {
+    console.log("Meeting detected:", evt);
+
+    // Log the meeting detected event
+    sdkLogger.logEvent('meeting-detected', {
+      platform: evt.window.platform,
+      windowId: evt.window.id
+    });
+
+    detectedMeeting = evt;
+
+    // Map platform codes to readable names
+    const platformNames = {
+      'zoom': 'Zoom',
+      'google-meet': 'Google Meet',
+      'teams': 'Microsoft Teams',
+      'webex': 'Webex',
+      'gotomeeting': 'GoToMeeting',
+      'bluejeans': 'BlueJeans',
+      'whereby': 'Whereby'
+    };
+
+    // Get the platform name or use the raw value
+    const platformName = platformNames[evt.window.platform] || evt.window.platform;
+
+    // Send the meeting detection status to the renderer process
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('meeting-detection-status', {
+        detected: true,
+        platform: platformName,
+        windowId: evt.window.id
+      });
+    }
+
+    // Also send the detected meeting event
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('meeting-detected', evt);
+    }
+  };
+
   // Listen for meeting detected events
   RecallAiSdk.addEventListener('meeting-detected', (evt) => {
-    console.log("Meeting detected:", evt);
+    handleMeetingDetected(evt);
 
     // Log the meeting detected event
     sdkLogger.logEvent('meeting-detected', {

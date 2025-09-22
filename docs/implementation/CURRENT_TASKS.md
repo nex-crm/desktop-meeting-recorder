@@ -33,36 +33,119 @@
    - Configured for local development (localhost:30000/api)
    - Added Recall.ai API keys
 
-## Current Status: Build Issues
+## Current Status: Desktop Authentication Integration - COMPLETED ✅
+**Date**: 2025-01-22
+**Status**: Authentication flow fully working with all issues resolved
 
-### Known Issues:
-1. **npm start error** - Need to debug Electron/Webpack build
-2. **OAuth endpoints missing** - Need to add to core API
+### Implementation Completed:
+1. **Backend Changes** - COMPLETED
+   - Added `/v1/auth/desktop/exchange` endpoint in core/internal/iam/http/handler.go
+   - Returns refresh token for desktop app when authenticated via cookies
+   - Registered route with CSRF protection
+   - Fixed cookie path from `/api/v1/auth/token` to `/api/v1/auth` for broader access
 
-## Next Session Tasks
+2. **Web App Changes** - COMPLETED
+   - Modified login hooks to detect desktop login (desktop=true param)
+   - Added token exchange call after successful login
+   - Redirects to desktop app with token on success
+   - Fixed response parsing for correct token structure
 
-### Immediate Priority: Fix Build Issues
-1. **Debug npm start error**
-   - Check webpack configuration
-   - Verify all dependencies installed correctly
-   - Check for import/require issues with new services
-   - May need to temporarily disable auth check in main.js
+3. **Desktop App Changes** - COMPLETED
+   - Simplified auth callback to accept token directly
+   - Removed complex OAuth flow in favor of simple token exchange
+   - Updated refresh token endpoint to use correct API structure
+   - Fixed API endpoint paths (removed duplicate `/api` prefix)
+   - Updated environment configuration for correct API/Web URLs
+   - Added proper token type handling (string types vs numeric)
+   - Added user dialog for session expiry notification
+   - Fixed isAuthenticated() to return boolean instead of JWT token string
+   - Added user data validation and automatic re-authentication detection
+   - Fixed name field extraction to properly handle protobuf structure (full_name vs fullName)
+   - Added safeguard to prevent email being displayed as name
 
-2. **Test Basic Functionality**
-   - Comment out auth requirement temporarily
-   - Verify Recall SDK still works
-   - Test meeting detection
-   - Ensure UI loads properly
+### TEMPORARY TESTING CHANGES (STILL PRESENT)
+**Date Added**: 2024-01-20
+**Status**: Testing Only - In desktop-meeting-recorder repo
 
-### Backend Integration Required (Core API)
-1. **Add OAuth2 Endpoints**
-   ```go
-   POST /api/v1/auth/desktop/login
-   POST /api/v1/auth/desktop/refresh
-   GET  /api/v1/auth/desktop/validate
+#### Temporary BrowserWindow for Playwright Testing:
+The authentication flow in `src/services/auth.js` has been modified to support testing with Playwright:
+
+1. **Changes Made** (Lines 71-132):
+   - Added conditional logic to use `BrowserWindow` instead of `shell.openExternal` when `USE_INTERNAL_BROWSER=true`
+   - Added auth window cleanup logic in `handleAuthCallback`
+
+2. **To Revert Before Production**:
+   - Remove the `useInternalBrowser` check and related `BrowserWindow` code
+   - Remove auth window cleanup code from `handleAuthCallback()`
+   - Always use `shell.openExternal(authUrl)` for production
+
+3. **Testing Usage**:
+   ```bash
+   # For testing with controlled browser window
+   USE_INTERNAL_BROWSER=true npm run start:debug
+
+   # For production (default)
+   npm start
    ```
 
-2. **Add Desktop Recording Endpoints**
+**IMPORTANT**: This change MUST be reverted before production deployment. The desktop app should always open authentication in the user's default browser for security and user experience reasons.
+
+## Authentication Flow Details
+
+### How Desktop Authentication Works:
+
+#### 1. Desktop App Initiates Login:
+- Desktop app opens browser to: `http://localhost:5173/login?desktop=true&redirect_uri=nex://auth/callback&state=<random_state>`
+- The `desktop=true` parameter signals the web app to handle this as a desktop login
+
+#### 2. User Logs In:
+- User completes normal web login (email/OTP or Google OAuth)
+- Web app stores auth cookies as usual
+
+#### 3. Token Exchange:
+- After successful login, web app detects `desktop=true` parameter
+- Makes POST request to `/v1/auth/desktop/exchange` (with cookies)
+- Backend reads auth cookies and returns the refresh token
+
+#### 4. Desktop Redirect:
+- Web app redirects to: `nex://auth/callback?token=<refresh_token>&state=<state>`
+- Desktop app receives the token via protocol handler
+
+#### 5. Token Management:
+- Desktop app uses refresh token with `/v1/auth/token/refresh` to get access token
+- Stores both tokens securely
+- Sets up automatic token refresh before expiry
+- Shows dialog prompting re-authentication when session expires
+
+### Security Features:
+- State parameter prevents CSRF attacks
+- Tokens never exposed in web app JavaScript (uses HttpOnly cookies)
+- Exchange endpoint requires valid auth cookies
+- Desktop app validates state before accepting tokens
+
+### Authentication Bug Fixes (2025-01-22) ✅
+1. **Avatar Not Displaying Issue** - RESOLVED
+   - Root cause: `isAuthenticated()` was returning JWT token string instead of boolean
+   - Fix: Modified return statement to use `!!` for boolean conversion
+
+2. **User Data Not Loading** - RESOLVED
+   - Root cause: User profile wasn't fetched after initial authentication
+   - Fix: Added `fetchUserProfile()` validation and re-authentication flow
+   - Added check for missing user data in `validateSession()`
+
+3. **Name Display Issues** - RESOLVED
+   - Root cause: Field name mismatch (fullName vs full_name) and potential email/name confusion
+   - Fix: Added proper field extraction logic with safeguards
+   - Added validation to ensure email is not displayed as name
+
+### Backend Integration Completed (Core API) ✅
+1. **Desktop Authentication Endpoint** - COMPLETED
+   - `POST /v1/auth/desktop/exchange` - Exchange cookies for refresh token
+   - Cookie path configuration updated for proper access
+   - CSRF protection maintained
+
+### Backend Integration Still Required (Core API)
+1. **Add Desktop Recording Endpoints**
    ```go
    POST /api/v1/desktop/recording/create
    POST /api/v1/desktop/recording/initiate-upload
@@ -77,7 +160,7 @@
    POST /api/v1/calendar/meeting/{eventId}/recording-intent
    ```
 
-### Phase 2: Core Features (After Build Fix)
+### Phase 2: Core Features (Ready to Start)
 1. **Meeting Detection Integration**
    - Connect Recall SDK detection with calendar data
    - Implement smart matching algorithm
