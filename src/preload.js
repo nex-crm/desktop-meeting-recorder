@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   debugGetHandlers: () => ipcRenderer.invoke('debugGetHandlers'),
   checkForDetectedMeeting: () => ipcRenderer.invoke('checkForDetectedMeeting'),
   joinDetectedMeeting: () => ipcRenderer.invoke('joinDetectedMeeting'),
+  testNotification: () => ipcRenderer.invoke('testNotification'),
   onOpenMeetingNote: (callback) => ipcRenderer.on('open-meeting-note', (_, meetingId) => callback(meetingId)),
   onRecordingCompleted: (callback) => ipcRenderer.on('recording-completed', (_, meetingId) => callback(meetingId)),
   onTranscriptUpdated: (callback) => ipcRenderer.on('transcript-updated', (_, meetingId) => callback(meetingId)),
@@ -33,6 +34,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onParticipantsUpdated: (callback) => ipcRenderer.on('participants-updated', (_, meetingId) => callback(meetingId)),
   onVideoFrame: (callback) => ipcRenderer.on('video-frame', (_, data) => callback(data)),
   onMeetingDetectionStatus: (callback) => ipcRenderer.on('meeting-detection-status', (_, data) => callback(data)),
+  onInAppNotification: (callback) => ipcRenderer.on('show-in-app-notification', (_, data) => callback(data)),
   getActiveRecordingId: (noteId) => ipcRenderer.invoke('getActiveRecordingId', noteId),
 
   // Authentication APIs

@@ -580,6 +580,23 @@ function initSDK() {
     }
   });
 
+  // Helper function to send in-app notification
+  const sendInAppNotification = (platformName) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      // Bring app to focus
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+
+      // Send notification to renderer
+      mainWindow.webContents.send('show-in-app-notification', {
+        title: 'Meeting detected',
+        body: `${platformName} meeting found.`,
+        action: 'Start Recording',
+        type: 'meeting-detected'
+      });
+    }
+  };
+
   // Helper function to handle meeting detection
   const handleMeetingDetected = (evt) => {
     console.log("Meeting detected:", evt);
@@ -644,19 +661,51 @@ function initSDK() {
     // Get a user-friendly platform name, or use the raw platform name if not in our map
     const platformName = platformNames[evt.window.platform] || evt.window.platform;
 
-    // Send a notification
-    let notification = new Notification({
-      title: `${platformName} Meeting Detected`,
-      body: platformName
-    });
+    // Try to send a system notification
+    try {
+      if (Notification.isSupported()) {
+        console.log('Creating notification for platform:', platformName);
 
-    // Handle notification click
-    notification.on('click', () => {
-      console.log("Notification clicked for platform:", platformName);
-      joinDetectedMeeting();
-    });
+        // Send a notification
+        let notification = new Notification({
+          title: 'Meeting detected',
+          body: `${platformName} meeting found. Click to start recording.`,
+          silent: false, // Ensure notification makes a sound
+          urgency: 'normal' // Set urgency level
+        });
 
-    notification.show();
+        // Handle notification click
+        notification.on('click', () => {
+          console.log("Notification clicked for platform:", platformName);
+          // Bring the app to focus
+          if (mainWindow) {
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            mainWindow.focus();
+          }
+          joinDetectedMeeting();
+        });
+
+        notification.on('show', () => {
+          console.log('Notification shown successfully');
+        });
+
+        notification.on('failed', (event, error) => {
+          console.error('Notification failed:', error);
+          // Fallback to in-app notification
+          sendInAppNotification(platformName);
+        });
+
+        notification.show();
+        console.log('Notification.show() called');
+      } else {
+        console.log('Notifications are not supported, using in-app notification');
+        sendInAppNotification(platformName);
+      }
+    } catch (error) {
+      console.error('Error creating notification:', error);
+      // Fallback to in-app notification
+      sendInAppNotification(platformName);
+    }
 
     // Send the meeting detected status to the renderer process
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -1170,6 +1219,31 @@ ipcMain.handle('stopManualRecording', async (event, recordingId) => {
   } catch (error) {
     console.error('Error stopping manual recording:', error);
     return { success: false, error: error.message };
+  }
+});
+
+// Test notification handler
+ipcMain.handle('testNotification', async () => {
+  console.log('Testing notification...');
+
+  if (Notification.isSupported()) {
+    const notification = new Notification({
+      title: 'Test Notification',
+      body: 'If you see this, notifications are working!'
+    });
+
+    notification.on('show', () => {
+      console.log('Test notification shown successfully');
+    });
+
+    notification.on('failed', (event, error) => {
+      console.error('Test notification failed:', error);
+    });
+
+    notification.show();
+    return { success: true, message: 'Notification sent' };
+  } else {
+    return { success: false, message: 'Notifications not supported' };
   }
 });
 

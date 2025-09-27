@@ -1791,12 +1791,51 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Initially show home view
   showHomeView();
 
+  // Track if we've shown notification for current meeting
+  let lastNotificationShown = false;
+
   // Listen for meeting detection status updates
   window.electronAPI.onMeetingDetectionStatus((data) => {
     console.log('Meeting detection status update:', data);
 
     // Store the meeting detection state globally
     window.meetingDetected = data.detected;
+
+    // Show in-app notification when meeting is detected
+    if (data.detected && !lastNotificationShown) {
+      lastNotificationShown = true;
+
+      // Get platform name if provided
+      const platform = data.platform || 'Meeting';
+
+      // Create notification element directly
+      const notification = document.createElement('div');
+      notification.className = 'in-app-notification';
+      notification.innerHTML = `
+        <div class="notification-content">
+          <div class="notification-text">
+            <div class="notification-title">Meeting detected</div>
+            <div class="notification-body">${platform} meeting found.</div>
+          </div>
+          <button class="notification-action-btn" onclick="window.handleNotificationAction('meeting-detected')">
+            Start Recording
+          </button>
+        </div>
+        <button class="notification-close" onclick="this.parentElement.remove()">×</button>
+      `;
+      document.body.appendChild(notification);
+
+      // Auto-remove after 10 seconds
+      setTimeout(() => {
+        if (notification.parentElement) {
+          notification.classList.add('fade-out');
+          setTimeout(() => notification.remove(), 300);
+        }
+      }, 10000);
+    } else if (!data.detected) {
+      // Reset notification flag when meeting is no longer detected
+      lastNotificationShown = false;
+    }
 
     // Only update button state if we're in the home view
     const inHomeView = document.getElementById('homeView').style.display !== 'none';
@@ -2681,4 +2720,57 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log('Auth logout event received');
     window.updateAuthStatus();
   });
+
+  // Listen for in-app notifications
+  window.electronAPI.onInAppNotification((data) => {
+    console.log('In-app notification received:', data);
+
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = 'in-app-notification';
+    notification.innerHTML = `
+      <div class="notification-content">
+        <div class="notification-text">
+          <div class="notification-title">${data.title}</div>
+          <div class="notification-body">${data.body}</div>
+        </div>
+        ${data.action ? `
+          <button class="notification-action-btn" onclick="window.handleNotificationAction('${data.type}')">
+            ${data.action}
+          </button>
+        ` : ''}
+      </div>
+      <button class="notification-close" onclick="this.parentElement.remove()">×</button>
+    `;
+
+    // Add to document
+    document.body.appendChild(notification);
+
+    // Auto-remove after 10 seconds
+    setTimeout(() => {
+      if (notification.parentElement) {
+        notification.classList.add('fade-out');
+        setTimeout(() => notification.remove(), 300);
+      }
+    }, 10000);
+  });
+
+  // Handle notification action
+  window.handleNotificationAction = async (type) => {
+    if (type === 'meeting-detected') {
+      // Check if we have a detected meeting and join it
+      const hasDetectedMeeting = await window.electronAPI.checkForDetectedMeeting();
+      if (hasDetectedMeeting) {
+        console.log('Starting recording from notification...');
+        await window.electronAPI.joinDetectedMeeting();
+
+        // Close notification
+        const notification = document.querySelector('.in-app-notification');
+        if (notification) notification.remove();
+
+        // Show toast
+        showToast('Recording started');
+      }
+    }
+  };
 });
