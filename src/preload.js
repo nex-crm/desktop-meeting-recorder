@@ -37,7 +37,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Authentication APIs
   auth: {
-    login: () => ipcRenderer.invoke('auth:login'),
+    startEmailAuth: (email) => ipcRenderer.invoke('auth:startEmailAuth', email),
+    submitOTP: (attemptId, code) => ipcRenderer.invoke('auth:submitOTP', { attemptId, code }),
     logout: () => ipcRenderer.invoke('auth:logout'),
     getUser: () => ipcRenderer.invoke('auth:getUser'),
     getWorkspace: () => ipcRenderer.invoke('auth:getWorkspace'),
@@ -50,5 +51,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   calendar: {
     getUpcomingMeetings: (hours) => ipcRenderer.invoke('calendar:getUpcomingMeetings', hours),
     getMeetingDetails: (eventId) => ipcRenderer.invoke('calendar:getMeetingDetails', eventId),
+  },
+
+  // Settings APIs
+  settings: {
+    getDebugMode: () => ipcRenderer.invoke('settings:getDebugMode'),
   }
 });

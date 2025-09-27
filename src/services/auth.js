@@ -1,4 +1,4 @@
-const { BrowserWindow, shell } = require('electron');
+// Removed BrowserWindow and shell - not needed for direct API auth
 const axios = require('axios');
 const axiosRetry = require('axios-retry');
 const SecureStorage = require('./storage');
@@ -20,7 +20,8 @@ class NexAuthService extends EventEmitter {
       timeout: constants.API.TIMEOUT,
       headers: {
         'Content-Type': 'application/json',
-        'X-Client': 'desktop-recorder',
+        'X-Platform-Id': 'nex-desktop',
+        'X-Platform-Version': '1.0.0',
         'X-Device-Id': this.storage.getDeviceFingerprint(),
       },
     });
@@ -68,106 +69,48 @@ class NexAuthService extends EventEmitter {
     return client;
   }
 
-  async login() {
-    console.log('Starting login process...');
-    return new Promise((resolve, reject) => {
-      const authUrl = this.buildAuthUrl();
-      console.log('Auth URL:', authUrl);
-
-      // TODO: Remove this BrowserWindow logic after testing is complete
-      // This is only for testing with Playwright - in production, always use shell.openExternal
-      // Check if we should use BrowserWindow for testing (e.g., with Playwright)
-      const useInternalBrowser = process.env.USE_INTERNAL_BROWSER === 'true';
-      console.log('Use internal browser:', useInternalBrowser);
-
-      if (useInternalBrowser) {
-        // TODO: This is temporary for testing - remove after testing complete
-        // Create a new window for authentication (testing only)
-        this.authWindow = new BrowserWindow({
-          width: 1200,
-          height: 800,
-          webPreferences: {
-            nodeIntegration: false,
-            contextIsolation: true,
-          },
-        });
-
-        this.authWindow.loadURL(authUrl);
-
-        // Clean up when window is closed
-        this.authWindow.on('closed', () => {
-          this.authWindow = null;
-        });
-      } else {
-        // Open in user's default browser (production behavior)
-        shell.openExternal(authUrl);
-      }
-
-      // Store the promise handlers for the protocol callback
-      this.authPromiseResolve = resolve;
-      this.authPromiseReject = reject;
-
-      // Set a timeout for the auth flow
-      const authTimeout = setTimeout(() => {
-        this.authPromiseResolve = null;
-        this.authPromiseReject = null;
-        reject(new Error('Authentication timeout - please try again'));
-      }, 5 * 60 * 1000); // 5 minute timeout
-
-      // Store timeout reference for cleanup
-      this.authTimeout = authTimeout;
-    });
-  }
-
-  async handleAuthCallback(url) {
-    // Clear the timeout
-    if (this.authTimeout) {
-      clearTimeout(this.authTimeout);
-      this.authTimeout = null;
-    }
-
-    // TODO: Remove this auth window cleanup after testing is complete
-    // This is only needed when using BrowserWindow for testing
-    // Close the auth window if it exists
-    if (this.authWindow && !this.authWindow.isDestroyed()) {
-      this.authWindow.close();
-      this.authWindow = null;
-    }
-
-    if (!this.authPromiseResolve || !this.authPromiseReject) {
-      console.error('No pending auth request to handle callback');
-      return;
-    }
-
-    const resolve = this.authPromiseResolve;
-    const reject = this.authPromiseReject;
-
-    // Clear the stored handlers
-    this.authPromiseResolve = null;
-    this.authPromiseReject = null;
-
+  async startEmailAuth(email) {
+    console.log('Starting email authentication for:', email);
     try {
-      const { refreshToken } = this.extractAuthData(url);
-
-      // Use refresh token to get access token
-      const response = await this.apiClient.post('/v1/auth/token/refresh', {
-        token: refreshToken,
+      const response = await this.apiClient.post('/v1/auth/email', {
+        email: email,
       });
 
-      console.log('Token refresh response:', JSON.stringify(response.data, null, 2));
+      console.log('Email auth response:', JSON.stringify(response.data, null, 2));
 
-      // Extract tokens from the response - handle both wrapped and unwrapped responses
+      // Return the attempt data for OTP verification
+      return response.data;
+    } catch (error) {
+      console.error('Email auth error:', error);
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      }
+      throw error;
+    }
+  }
+
+  async submitOTP(attemptId, code) {
+    console.log('Submitting OTP for attempt:', attemptId);
+    try {
+      const response = await this.apiClient.post('/v1/auth/submit_otp', {
+        attemptId: attemptId,
+        code: code,
+      });
+
+      console.log('OTP submission response:', JSON.stringify(response.data, null, 2));
+
+      // Extract tokens from the response
       const authData = response.data.auth || response.data.data?.auth || response.data;
       const tokens = authData.tokens || [];
       console.log('Extracted tokens array:', tokens);
 
       // Find tokens by type - handle both string and numeric types
       const accessToken = tokens.find(t => t.type === 'TYPE_ACCESS' || t.type === 1)?.token;
-      const newRefreshToken = tokens.find(t => t.type === 'TYPE_REFRESH' || t.type === 2)?.token || refreshToken;
+      const refreshToken = tokens.find(t => t.type === 'TYPE_REFRESH' || t.type === 2)?.token;
 
-      if (!accessToken) {
-        console.error('No access token found in response:', response.data);
-        throw new Error('Failed to obtain access token');
+      if (!accessToken || !refreshToken) {
+        console.error('No access or refresh token found in response:', response.data);
+        throw new Error('Failed to obtain tokens');
       }
 
       // Calculate expires_in from the access token expiry
@@ -180,65 +123,34 @@ class NexAuthService extends EventEmitter {
       }
 
       // Store tokens
-      this.storage.setTokens(accessToken, newRefreshToken, expiresIn);
+      this.storage.setTokens(accessToken, refreshToken, expiresIn);
 
       const result = {
         accessToken,
-        refreshToken: newRefreshToken,
+        refreshToken,
         expiresIn,
       };
 
       await this.fetchUserProfile();
       this.setupTokenRefresh();
       this.emit('auth:success');
-      resolve(result);
+      return result;
     } catch (error) {
-      console.error('Auth callback error:', error);
-      this.emit('auth:error', error);
-      reject(error);
+      console.error('OTP submission error:', error);
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      }
+      throw error;
     }
   }
 
-  buildAuthUrl() {
-    const params = new URLSearchParams({
-      desktop: 'true',
-      client_id: constants.AUTH.CLIENT_ID,
-      redirect_uri: constants.AUTH.REDIRECT_URI,
-      state: this.generateState(),
-    });
-
-    // Use web app login page instead of API OAuth endpoint
-    const webAppUrl = process.env.NEX_WEB_URL || 'https://app.nex.ai';
-    return `${webAppUrl}/login?${params.toString()}`;
+  // This method is no longer needed for direct API auth
+  // Keeping for backward compatibility if needed
+  async handleAuthCallback(url) {
+    console.warn('handleAuthCallback is deprecated for direct API auth');
   }
 
-  generateState() {
-    const crypto = require('crypto');
-    const state = crypto.randomBytes(32).toString('hex');
-    this.storage.store.set('oauth_state', state);
-    return state;
-  }
-
-  extractAuthData(url) {
-    const urlObj = new URL(url);
-    const state = urlObj.searchParams.get('state');
-    const token = urlObj.searchParams.get('token');
-
-    const savedState = this.storage.store.get('oauth_state');
-    if (state !== savedState) {
-      throw new Error('OAuth state mismatch - possible CSRF attack');
-    }
-
-    this.storage.store.delete('oauth_state');
-
-    if (!token) {
-      throw new Error('No authentication token found in callback');
-    }
-
-    return { refreshToken: token };
-  }
-
-  // This method is no longer needed - we use the refresh token directly
+  // These methods are no longer needed for direct API auth
 
   async refreshToken() {
     const tokens = this.storage.getTokens();

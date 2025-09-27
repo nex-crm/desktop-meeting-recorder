@@ -7,6 +7,256 @@
  */
 
 import './index.css';
+import { TranscriptService } from './services/transcript.mjs';
+
+// Login UI Management
+let currentAttemptId = null;
+let resendTimer = null;
+
+// Initialize login UI handlers
+function initializeLoginUI() {
+  const loginView = document.getElementById('loginView');
+  const emailForm = document.getElementById('emailForm');
+  const otpForm = document.getElementById('otpForm');
+  const emailInput = document.getElementById('emailInput');
+  const emailError = document.getElementById('emailError');
+  const otpError = document.getElementById('otpError');
+  const otpInputs = document.querySelectorAll('.otp-input');
+  const resendCodeBtn = document.getElementById('resendCodeBtn');
+  const backToEmailBtn = document.getElementById('backToEmailBtn');
+  const userEmail = document.getElementById('userEmail');
+  const resendTimerSpan = document.getElementById('resendTimer');
+  const emailStep = document.getElementById('emailStep');
+  const otpStep = document.getElementById('otpStep');
+  const emailSubmitBtn = document.getElementById('emailSubmitBtn');
+  const otpSubmitBtn = document.getElementById('otpSubmitBtn');
+
+  // Handle email form submission
+  if (emailForm) {
+    emailForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      emailError.textContent = '';
+      emailSubmitBtn.disabled = true;
+      emailSubmitBtn.textContent = 'Sending...';
+
+      const email = emailInput.value.trim();
+
+      try {
+        const result = await window.electronAPI.auth.startEmailAuth(email);
+
+        if (result.success && result.data) {
+          currentAttemptId = result.data.attempt?.id;
+          userEmail.textContent = email;
+
+          // Switch to OTP step
+          emailStep.style.display = 'none';
+          otpStep.style.display = 'block';
+
+          // Focus first OTP input
+          if (otpInputs[0]) otpInputs[0].focus();
+
+          // Start resend timer
+          startResendTimer();
+        } else {
+          emailError.textContent = result.error || 'Failed to send verification email';
+        }
+      } catch (error) {
+        console.error('Email auth error:', error);
+        emailError.textContent = 'An error occurred. Please try again.';
+      } finally {
+        emailSubmitBtn.disabled = false;
+        emailSubmitBtn.textContent = 'Continue';
+      }
+    });
+  }
+
+  // Handle OTP input
+  otpInputs.forEach((input, index) => {
+    input.addEventListener('input', (e) => {
+      const value = e.target.value;
+
+      if (value.length === 1) {
+        // Add filled class
+        input.classList.add('filled');
+
+        // Move to next input
+        if (index < otpInputs.length - 1) {
+          otpInputs[index + 1].focus();
+        } else {
+          // All inputs filled, submit form
+          handleOTPSubmit();
+        }
+      } else {
+        input.classList.remove('filled');
+      }
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Backspace' && !input.value && index > 0) {
+        // Move to previous input on backspace
+        otpInputs[index - 1].focus();
+      }
+    });
+
+    // Handle paste
+    input.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const pastedData = e.clipboardData.getData('text').slice(0, 6);
+
+      for (let i = 0; i < pastedData.length && i < otpInputs.length; i++) {
+        otpInputs[i].value = pastedData[i];
+        otpInputs[i].classList.add('filled');
+      }
+
+      if (pastedData.length === 6) {
+        handleOTPSubmit();
+      }
+    });
+  });
+
+  // Handle OTP form submission
+  if (otpForm) {
+    otpForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      handleOTPSubmit();
+    });
+  }
+
+  async function handleOTPSubmit() {
+    otpError.textContent = '';
+    const otp = Array.from(otpInputs).map(input => input.value).join('');
+
+    if (otp.length !== 6) {
+      otpError.textContent = 'Please enter all 6 digits';
+      return;
+    }
+
+    otpSubmitBtn.disabled = true;
+    otpSubmitBtn.textContent = 'Verifying...';
+
+    try {
+      const result = await window.electronAPI.auth.submitOTP(currentAttemptId, otp);
+
+      if (result.success) {
+        // Successfully authenticated
+        loginView.style.display = 'none';
+        document.querySelector('.app-container').style.display = 'flex';
+
+        // Clear OTP inputs
+        otpInputs.forEach(input => {
+          input.value = '';
+          input.classList.remove('filled');
+        });
+
+        // Update auth status - call the global function if it exists
+        if (window.updateAuthStatus) {
+          window.updateAuthStatus();
+        } else {
+          // Fallback: reload the page to check auth status
+          window.location.reload();
+        }
+      } else {
+        otpError.textContent = result.error || 'Invalid code. Please try again.';
+
+        // Clear OTP inputs on error
+        otpInputs.forEach(input => {
+          input.value = '';
+          input.classList.remove('filled');
+        });
+        otpInputs[0].focus();
+      }
+    } catch (error) {
+      console.error('OTP submission error:', error);
+      otpError.textContent = 'An error occurred. Please try again.';
+    } finally {
+      otpSubmitBtn.disabled = false;
+      otpSubmitBtn.textContent = 'Verify';
+    }
+  }
+
+  // Handle back to email button
+  if (backToEmailBtn) {
+    backToEmailBtn.addEventListener('click', () => {
+      // Clear OTP inputs
+      otpInputs.forEach(input => {
+        input.value = '';
+        input.classList.remove('filled');
+      });
+      otpError.textContent = '';
+
+      // Clear resend timer
+      if (resendTimer) {
+        clearInterval(resendTimer);
+        resendTimer = null;
+      }
+
+      // Switch to email step
+      otpStep.style.display = 'none';
+      emailStep.style.display = 'block';
+      emailInput.focus();
+    });
+  }
+
+  // Handle resend code button
+  if (resendCodeBtn) {
+    resendCodeBtn.addEventListener('click', async () => {
+      if (resendCodeBtn.disabled) return;
+
+      const email = userEmail.textContent;
+      resendCodeBtn.disabled = true;
+
+      try {
+        const result = await window.electronAPI.auth.startEmailAuth(email);
+
+        if (result.success && result.data) {
+          currentAttemptId = result.data.attempt?.id;
+
+          // Clear OTP inputs
+          otpInputs.forEach(input => {
+            input.value = '';
+            input.classList.remove('filled');
+          });
+          otpInputs[0].focus();
+
+          // Restart timer
+          startResendTimer();
+
+          // Show success message briefly
+          otpError.textContent = '';
+          const originalText = resendCodeBtn.textContent;
+          resendCodeBtn.textContent = 'Code sent!';
+          setTimeout(() => {
+            resendCodeBtn.textContent = originalText;
+          }, 2000);
+        } else {
+          otpError.textContent = 'Failed to resend code';
+        }
+      } catch (error) {
+        console.error('Resend code error:', error);
+        otpError.textContent = 'Failed to resend code';
+      }
+    });
+  }
+
+  function startResendTimer() {
+    let seconds = 45;
+    resendCodeBtn.disabled = true;
+
+    if (resendTimer) clearInterval(resendTimer);
+
+    resendTimer = setInterval(() => {
+      seconds--;
+      resendTimerSpan.textContent = `(${seconds}s)`;
+
+      if (seconds <= 0) {
+        clearInterval(resendTimer);
+        resendTimer = null;
+        resendTimerSpan.textContent = '';
+        resendCodeBtn.disabled = false;
+      }
+    }, 1000);
+  }
+}
 
 // Create empty meetings data structure to be filled from the file
 const meetingsData = {
@@ -268,27 +518,147 @@ function createMeetingCard(meeting) {
   return card;
 }
 
+// Function to update live transcript in sidebar
+function updateLiveTranscript(transcript) {
+  const chatContainer = document.getElementById('transcriptChat');
+  if (!chatContainer) return;
+
+  // Clear placeholder if it exists
+  const placeholder = chatContainer.querySelector('.transcript-placeholder');
+  if (placeholder) {
+    placeholder.remove();
+  }
+
+  // Group consecutive messages from the same speaker
+  let processedTranscript = [];
+  let currentSpeaker = null;
+  let currentMessages = [];
+
+  transcript.forEach(entry => {
+    if (entry.speaker !== currentSpeaker) {
+      if (currentSpeaker && currentMessages.length > 0) {
+        processedTranscript.push({
+          speaker: currentSpeaker,
+          messages: [...currentMessages],
+          timestamp: currentMessages[0].timestamp
+        });
+      }
+      currentSpeaker = entry.speaker;
+      currentMessages = [entry];
+    } else {
+      currentMessages.push(entry);
+    }
+  });
+
+  // Add the last group
+  if (currentSpeaker && currentMessages.length > 0) {
+    processedTranscript.push({
+      speaker: currentSpeaker,
+      messages: [...currentMessages],
+      timestamp: currentMessages[0].timestamp
+    });
+  }
+
+  // Clear and rebuild the chat
+  chatContainer.innerHTML = '';
+
+  processedTranscript.forEach((group, index) => {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'transcript-message';
+
+    // Alternate between user and AI styling for different speakers
+    if (index % 2 === 0) {
+      messageDiv.classList.add('ai-message');
+    } else {
+      messageDiv.classList.add('user-message');
+    }
+
+    const bubble = document.createElement('div');
+    bubble.className = 'message-bubble';
+
+    // Add speaker name
+    const speakerDiv = document.createElement('div');
+    speakerDiv.className = 'message-speaker';
+    speakerDiv.textContent = group.speaker;
+    bubble.appendChild(speakerDiv);
+
+    // Add combined text
+    const textDiv = document.createElement('div');
+    textDiv.className = 'message-text';
+    textDiv.textContent = group.messages.map(m => m.text).join(' ');
+    bubble.appendChild(textDiv);
+
+    // Add timestamp
+    const timeDiv = document.createElement('div');
+    timeDiv.className = 'message-time';
+    const time = new Date(group.timestamp);
+    timeDiv.textContent = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    bubble.appendChild(timeDiv);
+
+    messageDiv.appendChild(bubble);
+    chatContainer.appendChild(messageDiv);
+  });
+
+  // Scroll to bottom
+  chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+// Function to update the unified record button based on meeting detection
+function updateRecordButtonState() {
+  const recordMeetingBtn = document.getElementById('recordMeetingBtn');
+  if (!recordMeetingBtn) return;
+
+  if (window.meetingDetected) {
+    // Meeting detected - enable button for video recording
+    recordMeetingBtn.disabled = false;
+    recordMeetingBtn.classList.remove('audio-mode');
+    recordMeetingBtn.classList.add('video-mode');
+    recordMeetingBtn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="btn-icon">
+        <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" fill="currentColor"/>
+      </svg>
+      <span>Record Meeting with Video</span>
+    `;
+  } else {
+    // No meeting detected - enable button for audio-only recording
+    recordMeetingBtn.disabled = false;
+    recordMeetingBtn.classList.remove('video-mode');
+    recordMeetingBtn.classList.add('audio-mode');
+    recordMeetingBtn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="btn-icon">
+        <path d="M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3z" fill="currentColor"/>
+        <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" fill="currentColor"/>
+      </svg>
+      <span>Record Meeting with Audio only</span>
+    `;
+  }
+}
+
 // Function to show home view
 function showHomeView() {
   document.getElementById('homeView').style.display = 'block';
   document.getElementById('editorView').style.display = 'none';
   document.getElementById('backButton').style.display = 'none';
-  document.getElementById('newNoteBtn').style.display = 'block';
   document.getElementById('toggleSidebar').style.display = 'none';
 
-  // Show Record Meeting button and set its state based on meeting detection
-  const joinMeetingBtn = document.getElementById('joinMeetingBtn');
-  if (joinMeetingBtn) {
-    // Always show the button
-    joinMeetingBtn.style.display = 'block';
-    joinMeetingBtn.innerHTML = 'Record Meeting';
+  // Hide the meeting sidebar
+  const sidebar = document.getElementById('meetingSidebar');
+  if (sidebar) {
+    sidebar.style.display = 'none';
+  }
 
-    // Enable/disable based on meeting detection
-    if (window.meetingDetected) {
-      joinMeetingBtn.disabled = false;
-    } else {
-      joinMeetingBtn.disabled = true;
-    }
+  // Hide the sidebar toggle button
+  const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
+  if (sidebarToggleBtn) {
+    sidebarToggleBtn.style.display = 'none';
+  }
+
+  // Show unified Record Meeting button and set its state based on meeting detection
+  const recordMeetingBtn = document.getElementById('recordMeetingBtn');
+  if (recordMeetingBtn) {
+    // Always show the button
+    recordMeetingBtn.style.display = 'block';
+    updateRecordButtonState();
   }
 }
 
@@ -300,17 +670,64 @@ function showEditorView(meetingId) {
   document.getElementById('homeView').style.display = 'none';
   document.getElementById('editorView').style.display = 'block';
   document.getElementById('backButton').style.display = 'block';
-  document.getElementById('newNoteBtn').style.display = 'none';
-  document.getElementById('toggleSidebar').style.display = 'none'; // Hide the sidebar toggle
+  document.getElementById('toggleSidebar').style.display = 'none'; // Hide the old sidebar toggle
 
-  // Always hide the join meeting button when in editor view
-  const joinMeetingBtn = document.getElementById('joinMeetingBtn');
-  if (joinMeetingBtn) {
-    joinMeetingBtn.style.display = 'none';
+  // Always hide the record meeting button when in editor view
+  const recordMeetingBtn = document.getElementById('recordMeetingBtn');
+  if (recordMeetingBtn) {
+    recordMeetingBtn.style.display = 'none';
+  }
+
+  // Show the new meeting sidebar
+  const sidebar = document.getElementById('meetingSidebar');
+  if (sidebar) {
+    sidebar.style.display = 'flex';
+    sidebar.classList.add('collapsed'); // Always start collapsed
+  }
+
+  // Show the sidebar toggle button and reset its state
+  const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
+  if (sidebarToggleBtn) {
+    sidebarToggleBtn.style.display = 'block';
+    sidebarToggleBtn.classList.remove('expanded'); // Reset button position
+    // Reset icon to left arrow (for opening)
+    sidebarToggleBtn.innerHTML = `
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M15.41 7.41L14 6L8 12L14 18L15.41 16.59L10.83 12L15.41 7.41Z" fill="currentColor"/>
+      </svg>
+    `;
   }
 
   // Find the meeting in either upcoming or past meetings
   let meeting = [...upcomingMeetings, ...pastMeetings].find(m => m.id === meetingId);
+
+  // Update transcript service with meeting data
+  if (meeting && meeting.transcript && meeting.transcript.length > 0) {
+    transcriptService.setTranscript(meeting.transcript);
+    if (window.updateTranscriptButtons) {
+      window.updateTranscriptButtons(true);
+    }
+    // Update live transcript in sidebar
+    updateLiveTranscript(meeting.transcript);
+  } else {
+    transcriptService.setTranscript([]);
+    if (window.updateTranscriptButtons) {
+      window.updateTranscriptButtons(false);
+    }
+    // Clear transcript in sidebar
+    const chatContainer = document.getElementById('transcriptChat');
+    if (chatContainer) {
+      chatContainer.innerHTML = `
+        <div class="transcript-placeholder">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3z" fill="#999" opacity="0.5"/>
+            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" fill="#999" opacity="0.5"/>
+          </svg>
+          <p>Transcript will appear here when recording starts</p>
+        </div>
+      `;
+    }
+  }
 
   if (!meeting) {
     console.error(`Meeting not found: ${meetingId}`);
@@ -696,6 +1113,16 @@ function updateDebugTranscript(transcript) {
   const transcriptContent = document.getElementById('transcriptContent');
   if (!transcriptContent) return;
 
+  // Update transcript service with new data
+  transcriptService.setTranscript(transcript);
+
+  // Show download button when transcript is available
+  if (transcript && transcript.length > 0) {
+    if (window.updateTranscriptButtons) {
+      window.updateTranscriptButtons(true);
+    }
+  }
+
   // Check if user was at bottom before clearing content
   const wasAtBottom = transcriptContent.scrollTop + transcriptContent.clientHeight >= transcriptContent.scrollHeight - 5;
 
@@ -754,7 +1181,7 @@ function updateDebugTranscript(transcript) {
 // Function to update the video preview in the debug panel
 function updateDebugVideoPreview(frameData) {
   // Get the image data from the frame
-  const { buffer, participantId, participantName, frameType } = frameData;
+  const { frameType } = frameData;
 
   // Determine if this is a screenshare or participant video
   const isScreenshare = frameType !== 'webcam';
@@ -780,7 +1207,7 @@ function updateParticipantVideoPreview(frameData) {
   const videoContent = document.getElementById('videoContent');
   if (!videoContent) return;
 
-  const { buffer, participantId, participantName, frameType } = frameData;
+  const { buffer, participantId, participantName } = frameData;
 
   // Check if we already have a container for this participant
   let participantVideoContainer = document.getElementById(`video-participant-${participantId}`);
@@ -831,7 +1258,7 @@ function updateScreensharePreview(frameData) {
   const screenshareContent = document.getElementById('screenshareContent');
   if (!screenshareContent) return;
 
-  const { buffer, participantId, participantName, frameType } = frameData;
+  const { buffer, participantId } = frameData;
 
   // Check if we already have a container for this screenshare
   let screenshareContainer = document.getElementById(`screenshare-participant-${participantId}`);
@@ -1222,9 +1649,131 @@ const sdkLogger = {
   }
 };
 
+// Global transcript service instance
+let transcriptService;
+window.transcriptService = null; // Make it accessible for debugging
+
+// Initialize sidebar functionality
+function initMeetingSidebar() {
+  const sidebar = document.getElementById('meetingSidebar');
+  const toggleBtn = document.getElementById('sidebarToggleBtn');
+  const copyTextBtn = document.getElementById('copyTextBtn');
+  const downloadTranscriptBtn = document.getElementById('downloadTranscriptBtn');
+
+  if (!sidebar || !toggleBtn) return;
+
+  // Toggle sidebar
+  toggleBtn.addEventListener('click', () => {
+    sidebar.classList.toggle('collapsed');
+    // Toggle button position class and icon direction
+    if (sidebar.classList.contains('collapsed')) {
+      toggleBtn.classList.remove('expanded');
+      // Change icon to point left (to open)
+      toggleBtn.innerHTML = `
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M15.41 7.41L14 6L8 12L14 18L15.41 16.59L10.83 12L15.41 7.41Z" fill="currentColor"/>
+        </svg>
+      `;
+    } else {
+      toggleBtn.classList.add('expanded');
+      // Change icon to point right (to close)
+      toggleBtn.innerHTML = `
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M8.59 16.59L10 18L16 12L10 6L8.59 7.41L13.17 12L8.59 16.59Z" fill="currentColor"/>
+        </svg>
+      `;
+    }
+  });
+
+  // Copy text functionality
+  if (copyTextBtn) {
+    copyTextBtn.addEventListener('click', async () => {
+      const editorElement = document.getElementById('simple-editor');
+      if (editorElement) {
+        const notesContent = editorElement.value;
+        transcriptService.setNotes(notesContent);
+
+        const success = await transcriptService.copyNotesToClipboard();
+        if (success) {
+          showToast('Notes copied to clipboard!');
+        } else {
+          showToast('Failed to copy notes', 'error');
+        }
+      }
+    });
+  }
+
+  // Download transcript functionality
+  if (downloadTranscriptBtn) {
+    downloadTranscriptBtn.addEventListener('click', () => {
+      const meeting = [...upcomingMeetings, ...pastMeetings].find(m => m.id === currentEditingMeetingId);
+      if (meeting && meeting.title) {
+        const filename = `transcript-${meeting.title.replace(/[^a-z0-9]/gi, '_')}.txt`;
+        transcriptService.downloadTranscript(filename);
+        showToast('Transcript downloaded!');
+      } else {
+        transcriptService.downloadTranscript();
+        showToast('Transcript downloaded!');
+      }
+    });
+  }
+}
+
+// Update transcript buttons visibility
+window.updateTranscriptButtons = function(hasTranscript) {
+  const downloadBtn = document.getElementById('downloadTranscriptBtn');
+  if (downloadBtn) {
+    downloadBtn.style.display = hasTranscript ? 'flex' : 'none';
+  }
+};
+
+// Toast notification helper
+function showToast(message, type = 'success') {
+  const existingToast = document.querySelector('.copy-toast');
+  if (existingToast) {
+    existingToast.remove();
+  }
+
+  const toast = document.createElement('div');
+  toast.className = 'copy-toast';
+  toast.style.background = type === 'error' ? '#f44336' : '#4caf50';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+
+  setTimeout(() => {
+    toast.remove();
+  }, 3000);
+}
+
 // Initialize the app when the DOM is loaded
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('DOM content loaded, loading data from file...');
+
+  // Check if debug panel should be shown
+  const showDebugPanel = await window.electronAPI.settings.getDebugMode();
+  const debugPanelToggle = document.getElementById('debugPanelToggle');
+  const debugPanel = document.getElementById('debugPanel');
+
+  if (!showDebugPanel) {
+    // Hide debug panel and toggle button in production
+    if (debugPanelToggle) {
+      debugPanelToggle.style.display = 'none';
+    }
+    if (debugPanel) {
+      debugPanel.style.display = 'none';
+    }
+  } else {
+    // Keep the existing debug panel initialization
+    console.log('Debug mode enabled');
+  }
+
+  // Initialize transcript service
+  transcriptService = new TranscriptService();
+  window.transcriptService = transcriptService; // Make globally accessible
+  console.log('TranscriptService initialized');
+
+  // Initialize sidebar
+  initMeetingSidebar();
 
   // Initialize the SDK Logger
   sdkLogger.init();
@@ -1245,20 +1794,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Listen for meeting detection status updates
   window.electronAPI.onMeetingDetectionStatus((data) => {
     console.log('Meeting detection status update:', data);
-    const joinMeetingBtn = document.getElementById('joinMeetingBtn');
 
     // Store the meeting detection state globally
     window.meetingDetected = data.detected;
 
-    if (joinMeetingBtn) {
-      // Only update button state if we're in the home view
-      const inHomeView = document.getElementById('homeView').style.display !== 'none';
-
-      if (inHomeView) {
-        // Always show the button, but enable/disable based on meeting detection
-        joinMeetingBtn.style.display = 'block';
-        joinMeetingBtn.disabled = !data.detected;
-      }
+    // Only update button state if we're in the home view
+    const inHomeView = document.getElementById('homeView').style.display !== 'none';
+    if (inHomeView) {
+      updateRecordButtonState();
     }
   });
 
@@ -1391,6 +1934,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           const latestEntry = meeting.transcript[meeting.transcript.length - 1];
           console.log(`Latest transcript: ${latestEntry.speaker}: "${latestEntry.text}"`);
 
+          // Update the live transcript in the sidebar
+          updateLiveTranscript(meeting.transcript);
+
           // Update the transcript area in the debug panel
           updateDebugTranscript(meeting.transcript);
 
@@ -1447,7 +1993,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Listen for streaming summary updates
   window.electronAPI.onSummaryUpdate((data) => {
-    const { meetingId, content, timestamp } = data;
+    const { meetingId, content } = data;
 
     // If this note is currently being edited, update the content immediately
     if (currentEditingMeetingId === meetingId) {
@@ -1466,93 +2012,53 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Add event listeners for buttons
-  document.querySelector('.new-note-btn').addEventListener('click', async () => {
-    console.log('New note button clicked');
-    await createNewMeeting();
-  });
+  // Unified Record Meeting button handler
+  const recordMeetingBtn = document.getElementById('recordMeetingBtn');
+  if (recordMeetingBtn) {
+    recordMeetingBtn.addEventListener('click', async () => {
+      console.log('Record Meeting button clicked');
 
-  // Join Meeting button handler
-  document.getElementById('joinMeetingBtn').addEventListener('click', async () => {
-    console.log('Join Meeting button clicked');
+      if (window.meetingDetected) {
+        // Meeting detected - join the meeting with video
+        console.log('Joining detected meeting with video...');
 
-    // Get the button element
-    const joinButton = document.getElementById('joinMeetingBtn');
+        // Show loading state
+        const originalHTML = recordMeetingBtn.innerHTML;
+        recordMeetingBtn.disabled = true;
+        recordMeetingBtn.innerHTML = `
+          <svg class="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
+            <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          Joining...
+        `;
 
-    // Show loading state
-    const originalText = joinButton.textContent;
-    joinButton.disabled = true;
-    joinButton.innerHTML = `
-      <svg class="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
-        <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-      </svg>
-      Joining...
-    `;
-
-    // First check if there's a detected meeting
-    if (window.electronAPI.checkForDetectedMeeting) {
-      try {
-        const hasDetectedMeeting = await window.electronAPI.checkForDetectedMeeting();
-        if (hasDetectedMeeting) {
-          console.log('Found detected meeting, joining...');
-          await window.electronAPI.joinDetectedMeeting();
-          // Keep button disabled as we're navigating to a different view
-        } else {
-          console.log('No active meeting detected');
-
+        try {
+          const hasDetectedMeeting = await window.electronAPI.checkForDetectedMeeting();
+          if (hasDetectedMeeting) {
+            console.log('Found detected meeting, joining...');
+            await window.electronAPI.joinDetectedMeeting();
+            // Keep button disabled as we're navigating to a different view
+          } else {
+            console.log('No active meeting detected');
+            // Reset button state
+            recordMeetingBtn.disabled = false;
+            recordMeetingBtn.innerHTML = originalHTML;
+            showToast('No active meeting detected');
+          }
+        } catch (error) {
+          console.error('Error joining meeting:', error);
           // Reset button state
-          joinButton.disabled = false;
-          joinButton.textContent = originalText;
-
-          // Show a little toast message
-          const toast = document.createElement('div');
-          toast.className = 'toast';
-          toast.textContent = 'No active meeting detected';
-          document.body.appendChild(toast);
-
-          // Remove toast after 3 seconds
-          setTimeout(() => {
-            toast.style.opacity = '0';
-            setTimeout(() => {
-              document.body.removeChild(toast);
-            }, 300);
-          }, 3000);
+          recordMeetingBtn.disabled = false;
+          recordMeetingBtn.innerHTML = originalHTML;
+          showToast('Error joining meeting', 'error');
         }
-      } catch (error) {
-        console.error('Error joining meeting:', error);
-
-        // Reset button state
-        joinButton.disabled = false;
-        joinButton.textContent = originalText;
-
-        // Show error toast
-        const toast = document.createElement('div');
-        toast.className = 'toast';
-        toast.textContent = 'Error joining meeting';
-        document.body.appendChild(toast);
-
-        // Remove toast after 3 seconds
-        setTimeout(() => {
-          toast.style.opacity = '0';
-          setTimeout(() => {
-            document.body.removeChild(toast);
-          }, 300);
-        }, 3000);
+      } else {
+        // No meeting detected - create audio-only recording
+        console.log('Creating new note for audio-only recording...');
+        await createNewMeeting();
       }
-    } else {
-      // Fallback for direct call
-      try {
-        await window.electronAPI.joinDetectedMeeting();
-        // Keep button disabled as we're navigating to a different view
-      } catch (error) {
-        console.error('Error joining meeting:', error);
-
-        // Reset button state
-        joinButton.disabled = false;
-        joinButton.textContent = originalText;
-      }
-    }
-  });
+    });
+  }
 
   document.querySelector('.search-input').addEventListener('input', (e) => {
     console.log('Search query:', e.target.value);
@@ -2000,13 +2506,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Check authentication status and display user info
-  async function updateAuthStatus() {
+  // Check authentication status and display user info (make it global)
+  window.updateAuthStatus = async function() {
+    const loginView = document.getElementById('loginView');
+    const appContainer = document.querySelector('.app-container');
+
     try {
       const isAuthenticated = await window.electronAPI.auth.isAuthenticated();
       console.log('Authentication status:', isAuthenticated);
 
       if (isAuthenticated) {
+        // Hide login view, show app
+        if (loginView) loginView.style.display = 'none';
+        if (appContainer) appContainer.style.display = 'flex';
         const userResult = await window.electronAPI.auth.getUser();
         console.log('User data:', userResult);
 
@@ -2043,21 +2555,99 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Create a better avatar display with initials
             avatarElement.innerHTML = `
-              <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: 500; font-size: 14px; cursor: pointer;" title="${email || 'User'}">
+              <div class="avatar-circle" style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: 500; font-size: 14px; cursor: pointer;" title="${email || 'User'}">
                 ${initials}
               </div>
             `;
 
-            // Add click handler to show user info
-            avatarElement.onclick = () => {
+            // Add click handler to show user menu - use addEventListener instead of onclick
+            avatarElement.style.cursor = 'pointer';
+
+            // Remove any existing avatar click handlers first
+            const oldHandler = avatarElement._avatarClickHandler;
+            if (oldHandler) {
+              avatarElement.removeEventListener('click', oldHandler);
+            }
+
+            // Create and store new handler
+            const handleAvatarClick = function(e) {
+              e.stopPropagation();
+              e.preventDefault();
+
+              console.log('Avatar clicked!');
+
               const displayName = actualName || email || 'Unknown User';
               const displayEmail = email || 'No email';
-              alert(`Logged in as:\nName: ${displayName}\nEmail: ${displayEmail}`);
+
+              // Remove existing menu if any
+              const existingMenu = document.querySelector('.avatar-dropdown');
+              if (existingMenu) {
+                existingMenu.remove();
+                return;
+              }
+
+              // Create dropdown menu
+              const menu = document.createElement('div');
+              menu.className = 'avatar-dropdown';
+              menu.innerHTML = `
+                <div class="avatar-info">
+                  <div class="avatar-name">${displayName}</div>
+                  <div class="avatar-email">${displayEmail}</div>
+                </div>
+                <div class="avatar-divider"></div>
+                <button class="avatar-menu-item" id="logoutBtn">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" fill="currentColor"/>
+                  </svg>
+                  Sign out
+                </button>
+              `;
+
+              // Position the menu below the avatar
+              const rect = avatarElement.getBoundingClientRect();
+              menu.style.position = 'absolute';
+              menu.style.top = `${rect.bottom + 5}px`;
+              menu.style.right = `${window.innerWidth - rect.right}px`;
+
+              document.body.appendChild(menu);
+
+              // Handle logout click
+              document.getElementById('logoutBtn').onclick = async () => {
+                if (confirm('Are you sure you want to sign out?')) {
+                  menu.remove();
+                  await window.electronAPI.auth.logout();
+                  window.updateAuthStatus();
+                }
+              };
+
+              // Close menu when clicking outside
+              setTimeout(() => {
+                document.addEventListener('click', function closeMenu(e) {
+                  if (!menu.contains(e.target) && e.target !== avatarElement) {
+                    menu.remove();
+                    document.removeEventListener('click', closeMenu);
+                  }
+                });
+              }, 0);
             };
+
+            // Store and add the handler
+            avatarElement._avatarClickHandler = handleAvatarClick;
+            avatarElement.addEventListener('click', handleAvatarClick);
           }
         }
       } else {
-        // Show not authenticated state
+        // Not authenticated - show login view
+        console.log('User not authenticated, showing login view');
+        if (loginView) {
+          loginView.style.display = 'flex';
+          if (appContainer) appContainer.style.display = 'none';
+          // Focus email input
+          const emailInput = document.getElementById('emailInput');
+          if (emailInput) emailInput.focus();
+        }
+
+        // Update avatar to show not logged in state
         const avatarElement = document.querySelector('.user-avatar');
         if (avatarElement) {
           avatarElement.innerHTML = `
@@ -2068,12 +2658,6 @@ document.addEventListener('DOMContentLoaded', async () => {
               </svg>
             </div>
           `;
-
-          avatarElement.onclick = async () => {
-            if (confirm('You are not logged in. Would you like to log in now?')) {
-              await window.electronAPI.auth.login();
-            }
-          };
         }
       }
     } catch (error) {
@@ -2081,17 +2665,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  // Initialize login UI handlers
+  initializeLoginUI();
+
   // Check auth status on load
-  updateAuthStatus();
+  window.updateAuthStatus();
 
   // Listen for auth events
   window.electronAPI.auth.onAuthSuccess(() => {
     console.log('Auth success event received');
-    updateAuthStatus();
+    window.updateAuthStatus();
   });
 
   window.electronAPI.auth.onAuthLogout(() => {
     console.log('Auth logout event received');
-    updateAuthStatus();
+    window.updateAuthStatus();
   });
 });

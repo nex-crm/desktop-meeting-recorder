@@ -181,6 +181,8 @@ app.whenReady().then(async () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('auth:success');
     }
+    // Initialize SDK after successful authentication
+    initSDK();
   });
 
   authService.on('auth:logout', () => {
@@ -190,6 +192,88 @@ app.whenReady().then(async () => {
     }
   });
 
+  // Authentication IPC handlers
+  ipcMain.handle('auth:startEmailAuth', async (event, email) => {
+    try {
+      const result = await authService.startEmailAuth(email);
+      return { success: true, data: result };
+    } catch (error) {
+      console.error('Email auth error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('auth:submitOTP', async (event, { attemptId, code }) => {
+    try {
+      const result = await authService.submitOTP(attemptId, code);
+      const user = authService.getUser();
+      const workspace = authService.getWorkspace();
+      return { success: true, tokens: result, user, workspace };
+    } catch (error) {
+      console.error('OTP submission error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('auth:logout', async () => {
+    try {
+      await authService.logout();
+      return { success: true };
+    } catch (error) {
+      console.error('Logout failed:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('auth:getUser', async () => {
+    try {
+      const user = authService.getUser();
+      return { success: true, user };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('auth:getWorkspace', async () => {
+    try {
+      const workspace = authService.getWorkspace();
+      return { success: true, workspace };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('auth:isAuthenticated', async () => {
+    return authService.isAuthenticated();
+  });
+
+  // Calendar IPC handlers
+  ipcMain.handle('calendar:getUpcomingMeetings', async (event, hours) => {
+    try {
+      const meetings = await apiService.getUpcomingMeetings(hours);
+      return { success: true, meetings };
+    } catch (error) {
+      console.error('Failed to fetch upcoming meetings:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('calendar:getMeetingDetails', async (event, eventId) => {
+    try {
+      const meeting = await apiService.getMeetingDetails(eventId);
+      return { success: true, meeting };
+    } catch (error) {
+      console.error('Failed to fetch meeting details:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Debug settings handler
+  ipcMain.handle('settings:getDebugMode', async () => {
+    // Only show debug panel if explicitly enabled
+    return process.env.SHOW_DEBUG_PANEL === 'true';
+  });
+
   // Create the main window first so it can handle protocol callbacks
   createWindow();
 
@@ -197,32 +281,9 @@ app.whenReady().then(async () => {
   const isAuthenticated = authService.isAuthenticated();
 
   if (!isAuthenticated) {
-    // Show login dialog
-    const result = await dialog.showMessageBox(mainWindow, {
-      type: 'info',
-      title: 'Authentication Required',
-      message: 'Please log in to Nex to use the Desktop Meeting Recorder',
-      buttons: ['Login', 'Cancel'],
-      defaultId: 0,
-      cancelId: 1
-    });
-
-    if (result.response === 0) {
-      try {
-        await authService.login();
-        console.log('Login successful');
-        // Initialize SDK after successful login
-        initSDK();
-      } catch (error) {
-        console.error('Login failed:', error);
-        dialog.showErrorBox('Authentication Failed', 'Failed to authenticate. The app will now exit.');
-        app.quit();
-        return;
-      }
-    } else {
-      app.quit();
-      return;
-    }
+    // The renderer will handle showing the login UI
+    console.log('User not authenticated - login UI will be shown');
+    // Don't initialize SDK yet - wait for successful authentication
   } else {
     // We have tokens, but let's validate the session and check for user data
     console.log('Validating existing session...');
@@ -231,57 +292,10 @@ app.whenReady().then(async () => {
     if (!validation.isValid) {
       console.log('Session validation failed:', validation.reason);
 
-      // Check if it's specifically because of missing user data
-      if (validation.reason.includes('user data')) {
-        const result = await dialog.showMessageBox(mainWindow, {
-          type: 'warning',
-          title: 'Re-authentication Required',
-          message: 'Your user profile could not be loaded. Please log in again to refresh your session.',
-          buttons: ['Re-authenticate', 'Cancel'],
-          defaultId: 0,
-          cancelId: 1
-        });
-
-        if (result.response === 0) {
-          try {
-            await authService.login();
-            console.log('Re-authentication successful');
-          } catch (error) {
-            console.error('Re-authentication failed:', error);
-            dialog.showErrorBox('Authentication Failed', 'Failed to re-authenticate. The app will now exit.');
-            app.quit();
-            return;
-          }
-        } else {
-          app.quit();
-          return;
-        }
-      } else {
-        // Generic session invalid dialog
-        const result = await dialog.showMessageBox(mainWindow, {
-          type: 'info',
-          title: 'Session Expired',
-          message: 'Your session has expired. Please log in again to continue.',
-          buttons: ['Login', 'Cancel'],
-          defaultId: 0,
-          cancelId: 1
-        });
-
-        if (result.response === 0) {
-          try {
-            await authService.login();
-            console.log('Re-authentication successful');
-          } catch (error) {
-            console.error('Re-authentication failed:', error);
-            dialog.showErrorBox('Authentication Failed', 'Failed to authenticate. The app will now exit.');
-            app.quit();
-            return;
-          }
-        } else {
-          app.quit();
-          return;
-        }
-      }
+      // Session is invalid, clear auth and show login UI
+      authService.logout();
+      console.log('Session invalid - cleared auth, login UI will be shown');
+      // The renderer will handle showing the login UI
     } else {
       console.log('Session is valid');
       // Initialize SDK for valid session
@@ -1262,70 +1276,7 @@ ipcMain.handle('loadMeetingsData', async () => {
   }
 });
 
-// Authentication IPC handlers
-ipcMain.handle('auth:login', async () => {
-  try {
-    await authService.login();
-    const user = authService.getUser();
-    return { success: true, user };
-  } catch (error) {
-    console.error('Login failed:', error);
-    return { success: false, error: error.message };
-  }
-});
 
-ipcMain.handle('auth:logout', async () => {
-  try {
-    await authService.logout();
-    return { success: true };
-  } catch (error) {
-    console.error('Logout failed:', error);
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('auth:getUser', async () => {
-  try {
-    const user = authService.getUser();
-    return { success: true, user };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('auth:getWorkspace', async () => {
-  try {
-    const workspace = authService.getWorkspace();
-    return { success: true, workspace };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('auth:isAuthenticated', async () => {
-  return authService.isAuthenticated();
-});
-
-// Calendar IPC handlers
-ipcMain.handle('calendar:getUpcomingMeetings', async (event, hours) => {
-  try {
-    const meetings = await apiService.getUpcomingMeetings(hours);
-    return { success: true, meetings };
-  } catch (error) {
-    console.error('Failed to fetch upcoming meetings:', error);
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('calendar:getMeetingDetails', async (event, eventId) => {
-  try {
-    const meeting = await apiService.getMeetingDetails(eventId);
-    return { success: true, meeting };
-  } catch (error) {
-    console.error('Failed to fetch meeting details:', error);
-    return { success: false, error: error.message };
-  }
-});
 
 // Function to create a new meeting note and start recording
 async function createMeetingNoteAndRecord(platformName) {
