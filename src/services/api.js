@@ -36,17 +36,17 @@ class NexApiService {
       return d;
     };
 
-    // Meeting starting in 2 minutes for testing notification
-    const testMeetingTime = new Date(now.getTime() + 2 * 60 * 1000); // 2 minutes from now
+    // Meeting starting in 55 seconds for testing notification (to trigger 1-minute notification quickly)
+    const testMeetingTime = new Date(now.getTime() + 55 * 1000); // 55 seconds from now
     mockMeetings.push({
       id: 1,
-      title: 'Daily Founders Sync',
+      title: 'Weekly team catchup',
       startTime: testMeetingTime.toISOString(),
       endTime: new Date(testMeetingTime.getTime() + 30 * 60 * 1000).toISOString(), // 30 minute meeting
       date: testMeetingTime.toISOString(),
       organizerEmail: 'founder@company.com',
       location: 'Conference Room',
-      videoMeetingUrl: 'https://zoom.us/j/123456789',
+      videoMeetingUrl: 'https://meet.google.com/abc-defg-hij',
       attendees: ['cofounder@company.com', 'cto@company.com']
     });
 
@@ -96,6 +96,85 @@ class NexApiService {
       organizerEmail: 'najmuzzaman@company.com',
       location: 'Customer Site',
       attendees: ['customer1@atlas.com', 'customer2@atlas.com']
+    });
+
+    // Additional meetings in the next 2 hours for testing
+    const in15minutes = new Date(now.getTime() + 15 * 60 * 1000);
+    mockMeetings.push({
+      id: 6,
+      title: 'Product Demo with Potential Client',
+      startTime: in15minutes.toISOString(),
+      endTime: new Date(in15minutes.getTime() + 45 * 60 * 1000).toISOString(),
+      date: in15minutes.toISOString(),
+      organizerEmail: 'sales@company.com',
+      location: 'Virtual',
+      videoMeetingUrl: 'https://zoom.us/j/555666777',
+      attendees: ['client@potential.com', 'sales@company.com']
+    });
+
+    const in30minutes = new Date(now.getTime() + 30 * 60 * 1000);
+    mockMeetings.push({
+      id: 7,
+      title: 'Engineering Sprint Planning',
+      startTime: in30minutes.toISOString(),
+      endTime: new Date(in30minutes.getTime() + 60 * 60 * 1000).toISOString(),
+      date: in30minutes.toISOString(),
+      organizerEmail: 'scrum.master@company.com',
+      location: 'Conference Room B',
+      videoMeetingUrl: 'https://meet.google.com/xyz-uvwx-abc',
+      attendees: ['dev1@company.com', 'dev2@company.com', 'dev3@company.com', 'qa@company.com']
+    });
+
+    const in45minutes = new Date(now.getTime() + 45 * 60 * 1000);
+    mockMeetings.push({
+      id: 8,
+      title: 'Marketing Campaign Review',
+      startTime: in45minutes.toISOString(),
+      endTime: new Date(in45minutes.getTime() + 30 * 60 * 1000).toISOString(),
+      date: in45minutes.toISOString(),
+      organizerEmail: 'marketing@company.com',
+      location: 'Virtual',
+      videoMeetingUrl: 'https://teams.microsoft.com/l/meetup-join/19:meeting_xyz',
+      attendees: ['marketing@company.com', 'content@company.com', 'design@company.com']
+    });
+
+    const in60minutes = new Date(now.getTime() + 60 * 60 * 1000);
+    mockMeetings.push({
+      id: 9,
+      title: 'One-on-One: Manager & Senior Dev',
+      startTime: in60minutes.toISOString(),
+      endTime: new Date(in60minutes.getTime() + 30 * 60 * 1000).toISOString(),
+      date: in60minutes.toISOString(),
+      organizerEmail: 'manager@company.com',
+      location: 'Manager Office',
+      videoMeetingUrl: 'https://zoom.us/j/111222333',
+      attendees: ['senior.dev@company.com']
+    });
+
+    const in90minutes = new Date(now.getTime() + 90 * 60 * 1000);
+    mockMeetings.push({
+      id: 10,
+      title: 'Customer Success Weekly Sync',
+      startTime: in90minutes.toISOString(),
+      endTime: new Date(in90minutes.getTime() + 45 * 60 * 1000).toISOString(),
+      date: in90minutes.toISOString(),
+      organizerEmail: 'cs.lead@company.com',
+      location: 'Virtual',
+      videoMeetingUrl: 'https://meet.google.com/customer-success-sync',
+      attendees: ['cs1@company.com', 'cs2@company.com', 'support@company.com']
+    });
+
+    const in120minutes = new Date(now.getTime() + 120 * 60 * 1000);
+    mockMeetings.push({
+      id: 11,
+      title: 'Design System Workshop',
+      startTime: in120minutes.toISOString(),
+      endTime: new Date(in120minutes.getTime() + 90 * 60 * 1000).toISOString(),
+      date: in120minutes.toISOString(),
+      organizerEmail: 'design.lead@company.com',
+      location: 'Design Studio',
+      videoMeetingUrl: 'https://zoom.us/j/design-workshop-2024',
+      attendees: ['designer1@company.com', 'designer2@company.com', 'ux@company.com', 'frontend@company.com']
     });
 
     console.log(`Returning ${mockMeetings.length} mock meetings`);

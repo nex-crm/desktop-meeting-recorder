@@ -90,6 +90,34 @@ Transform the forked Muesli app (Recall.ai demo) into a fully integrated Nex Des
 - Fixed sidebar state management when navigating between views
 - Added proper disabled state styling for buttons
 
+### Phase 3: Custom Notification System (COMPLETED)
+
+#### 1. Custom Notification Window
+- Implemented always-on-top custom notification window (bypasses DND mode)
+- Clean, minimal macOS-style design with white background
+- Single "Start Recording" CTA button
+- 60-second display duration
+- Slide-in animation from right side
+- Position: top-right corner (30px from top, 380px from right edge)
+
+#### 2. Smart Meeting Detection
+- Tracks meetings by unique session key (platform + window ID)
+- Shows notification only on first detection per meeting
+- Prevents duplicate notifications when stopping/restarting recording
+- Clears tracking only when meeting window actually closes
+
+#### 3. Duplicate Prevention Logic
+- Uses `handledMeetingSessions` Set to track notified meetings
+- Checks for existing notes before creating new ones
+- Prevents multiple notes for the same meeting session
+- Maintains state across recording stop/start cycles
+
+#### 4. Technical Implementation
+- Custom HTML/CSS loaded as data URL (no webpack dependency)
+- IPC handlers for notification actions
+- Integration with existing meeting detection flow
+- Removed in-app notification system (purple gradient popups)
+
 ## Current Authentication Flow
 
 ### How It Works:
@@ -163,6 +191,10 @@ npm start
 - [x] Live transcript updates during recording
 - [x] Sidebar toggle works correctly
 - [x] Button changes color/text based on meeting detection
+- [x] Custom notification appears on meeting detection
+- [x] Notification bypasses Do Not Disturb mode
+- [x] No duplicate notifications when stopping/starting recording
+- [x] No duplicate notes created for same meeting
 
 ## Environment Variables (.env)
 ```
@@ -183,5 +215,43 @@ OPENROUTER_KEY=<optional>
 SHOW_DEBUG_PANEL=false  # Set to true to show debug panel in dev
 ```
 
+### Phase 4: Calendar Integration (COMPLETED)
+
+#### 1. Calendar Sync Service Integration
+- Initialized CalendarSyncService in main process
+- Set up 5-minute sync intervals with Nex backend
+- Added IPC handlers for calendar events
+- Implemented offline support with cached meetings
+
+#### 2. Upcoming Meetings Display
+- Added "Coming up" section above notes on home page
+- Purple date badges matching Granola design
+- Meeting titles and times clearly displayed
+- Real-time updates via calendar sync
+
+#### 3. Smart Meeting View
+- **Today's meetings by default**: Shows only today's meetings initially
+- **"Show more/less" toggle**: Expands to show full week's meetings
+- **Responsive filtering**: Separates today's vs week's meetings
+- **Graceful fallback**: Shows first 3 weekly meetings if no meetings today
+
+#### 4. Future Meeting Handling
+- **Time-based UI**: Different interface for future vs current meetings
+- **"Starts at [time]" display**: Shows meeting start time for future meetings
+- **"Start now" button**: Appears for meetings within 2 hours
+- **Auto-hide recording controls**: Recording buttons hidden for future meetings
+- **Bottom overlay indicator**: Clean time display at bottom of note editor
+
+#### 5. Meeting Notes Management
+- **Click to create**: Clicking upcoming meeting creates note automatically
+- **Future note separation**: Future meeting notes excluded from past notes list
+- **isFuture flag**: Tracks meeting state for proper categorization
+- **Seamless transition**: Notes move from upcoming to past after meeting time
+
+#### 6. Mock Data for Development
+- Added fallback mock data when calendar API unavailable
+- Allows UI testing without backend integration
+- Simulates upcoming meetings for demonstration
+
 ## Next Steps
-The foundation is complete with authentication, basic recording, and UI enhancements done. The project is ready for the next phase of development based on updated requirements.
+The foundation is complete with authentication, recording, UI enhancements, and calendar integration done. The project now has a Granola-like interface with upcoming meetings and date-organized notes. Ready for the next phase of development based on updated requirements.

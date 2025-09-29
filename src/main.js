@@ -123,11 +123,11 @@ const createNotificationWindow = (data = {}) => {
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width, height } = primaryDisplay.workAreaSize;
 
-  // Create notification window
+  // Create notification window - increased height for dropdown
   notificationWindow = new BrowserWindow({
-    width: 360,
-    height: 80,
-    x: width - 380,
+    width: 420,
+    height: 100,
+    x: width - 440,
     y: 30,
     frame: false,
     transparent: true,
@@ -145,35 +145,127 @@ const createNotificationWindow = (data = {}) => {
   notificationWindow.setAlwaysOnTop(true, 'screen-saver');
   notificationWindow.setVisibleOnAllWorkspaces(true);
 
-  // Create the HTML content inline
+  // Get platform details for calendar meetings
+  const isCalendarMeeting = data.platform === 'CALENDAR';
+  const meetingTime = data.meeting?.startTime ?
+    new Date(data.meeting.startTime).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit'
+    }) : '';
+  const endTime = data.meeting?.endTime ?
+    new Date(data.meeting.endTime).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit'
+    }) : '';
+
+  // Determine platform icon and name
+  let platformIcon = '';
+  let platformName = 'Nex';
+  let platformLogo = '';
+
+  // Read SVG files and convert to data URLs
+  // Use app.getAppPath() to get the correct path regardless of webpack bundling
+  const appPath = app.getAppPath();
+  const logosPath = path.join(appPath, 'logos');
+  const platformLogos = {};
+
+  try {
+    const zoomSvg = fs.readFileSync(path.join(logosPath, 'zoom.svg'), 'utf8');
+    const teamsSvg = fs.readFileSync(path.join(logosPath, 'teams.svg'), 'utf8');
+    const meetSvg = fs.readFileSync(path.join(logosPath, 'meet.svg'), 'utf8');
+    const webexSvg = fs.readFileSync(path.join(logosPath, 'webex.svg'), 'utf8');
+
+    // Convert to data URLs
+    platformLogos.zoom = `data:image/svg+xml;base64,${Buffer.from(zoomSvg).toString('base64')}`;
+    platformLogos.teams = `data:image/svg+xml;base64,${Buffer.from(teamsSvg).toString('base64')}`;
+    platformLogos.meet = `data:image/svg+xml;base64,${Buffer.from(meetSvg).toString('base64')}`;
+    platformLogos.webex = `data:image/svg+xml;base64,${Buffer.from(webexSvg).toString('base64')}`;
+  } catch (err) {
+    console.error('Error loading platform logos from', logosPath, ':', err);
+    // Fallback to empty logos
+    platformLogos.zoom = '';
+    platformLogos.teams = '';
+    platformLogos.meet = '';
+    platformLogos.webex = '';
+  }
+
+  // Check for platform from data or meeting URL
+  if (data.platform && data.platform !== 'CALENDAR' && data.platform !== 'TEST') {
+    // Ad-hoc meeting - use platform directly
+    platformName = data.platform;
+    if (platformName.toLowerCase() === 'zoom') {
+      platformLogo = platformLogos.zoom;
+    } else if (platformName.toLowerCase() === 'teams') {
+      platformLogo = platformLogos.teams;
+    } else if (platformName.toLowerCase().includes('meet')) {
+      platformLogo = platformLogos.meet;
+    } else if (platformName.toLowerCase() === 'webex') {
+      platformLogo = platformLogos.webex;
+    }
+  } else if (data.meeting?.videoMeetingUrl) {
+    // Calendar meeting - extract from URL
+    if (data.meeting.videoMeetingUrl.includes('zoom')) {
+      platformLogo = platformLogos.zoom;
+      platformName = 'Zoom';
+    } else if (data.meeting.videoMeetingUrl.includes('meet.google')) {
+      platformLogo = platformLogos.meet;
+      platformName = 'Google Meet';
+    } else if (data.meeting.videoMeetingUrl.includes('teams')) {
+      platformLogo = platformLogos.teams;
+      platformName = 'Teams';
+    } else if (data.meeting.videoMeetingUrl.includes('webex')) {
+      platformLogo = platformLogos.webex;
+      platformName = 'WebEx';
+    }
+  } else if (data.platform === 'TEST') {
+    platformName = 'Test';
+  }
+
+  // Use camera emoji as fallback if no logo
+  if (!platformLogo) {
+    platformIcon = '📹';
+  }
+
+  // Create the HTML content inline - Nex style
   const html = `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="UTF-8">
       <style>
-        body {
+        * {
           margin: 0;
           padding: 0;
+          box-sizing: border-box;
+        }
+        body {
           background-color: transparent;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
           overflow: hidden;
           user-select: none;
         }
-        .notification {
-          background: rgba(255, 255, 255, 0.98);
-          border-radius: 10px;
-          padding: 14px 16px;
-          margin: 8px;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.1);
-          -webkit-app-region: drag;
-          animation: slideIn 0.25s ease-out;
+        .notification-wrapper {
           position: relative;
-          backdrop-filter: blur(30px);
+          padding: 10px;
+          width: 100%;
+          height: 100%;
+        }
+        .notification-wrapper:hover .close-btn {
+          opacity: 1 !important;
+        }
+        .notification {
+          background: white;
+          border-radius: 12px;
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.08);
+          animation: slideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+          position: relative;
+          display: flex;
+          align-items: stretch;
+          overflow: hidden;
         }
         @keyframes slideIn {
           from {
-            transform: translateX(400px);
+            transform: translateX(420px);
             opacity: 0;
           }
           to {
@@ -181,128 +273,267 @@ const createNotificationWindow = (data = {}) => {
             opacity: 1;
           }
         }
+        .accent-bar {
+          width: 4px;
+          background: #5AC8FA;
+          flex-shrink: 0;
+        }
+        .notification-body {
+          flex: 1;
+          padding: 16px;
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          -webkit-app-region: no-drag;
+        }
         .close-btn {
           position: absolute;
-          top: 8px;
-          right: 8px;
+          top: 2px;
+          left: 2px;
           -webkit-app-region: no-drag;
           cursor: pointer;
-          background: none;
-          border: none;
+          background: white;
+          border: 1px solid rgba(0, 0, 0, 0.1);
           font-size: 16px;
-          color: rgba(0, 0, 0, 0.4);
-          width: 20px;
-          height: 20px;
+          color: #666;
+          width: 28px;
+          height: 28px;
           display: flex;
           align-items: center;
           justify-content: center;
-          border-radius: 10px;
-          transition: all 0.2s;
+          border-radius: 14px;
+          transition: opacity 0.2s;
           padding: 0;
+          z-index: 1000;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+          opacity: 0;
         }
         .close-btn:hover {
-          color: rgba(0, 0, 0, 0.6);
-          background: rgba(0, 0, 0, 0.08);
+          color: #333;
+          background: #f5f5f5;
+          transform: scale(1.1);
         }
-        .notification-content {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-        .notification-icon {
-          font-size: 20px;
-        }
-        .notification-text {
+        .meeting-info {
           flex: 1;
+          padding-left: 20px;
         }
-        .notification-header {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          margin-bottom: 2px;
-          max-width: 100%;
-        }
-        h3 {
-          margin: 0;
-          color: #1a1a1a;
-          font-size: 13px;
+        .meeting-title {
+          font-size: 15px;
           font-weight: 600;
-          letter-spacing: -0.2px;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          flex: 1;
-          min-width: 0;
+          color: #1a1a1a;
+          margin-bottom: 4px;
+          letter-spacing: -0.3px;
         }
-        p {
-          margin: 0;
+        .meeting-time {
+          font-size: 14px;
           color: #666;
-          font-size: 12px;
-          line-height: 1.4;
+          letter-spacing: -0.2px;
         }
-        .btn-primary {
-          background: #007AFF;
-          color: white;
-          border: none;
-          border-radius: 6px;
-          padding: 6px 12px;
-          font-size: 12px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.15s;
-          letter-spacing: -0.1px;
+        .action-container {
+          position: relative;
           -webkit-app-region: no-drag;
         }
-        .btn-primary:hover {
-          background: #0051D5;
-          transform: scale(1.02);
-        }
-        .btn-primary:active {
-          transform: scale(0.98);
-        }
-        .platform-badge {
-          display: inline-flex;
+        .action-button {
+          background: white;
+          color: #333;
+          border: 2px solid #10B981;
+          border-radius: 8px;
+          padding: 10px 16px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+          letter-spacing: -0.2px;
+          display: flex;
           align-items: center;
-          background: #f0f0f0;
-          padding: 2px 6px;
+          gap: 8px;
+          min-width: 180px;
+          justify-content: space-between;
+          -webkit-app-region: no-drag;
+        }
+        .action-button:hover {
+          background: #f9f9f9;
+          transform: translateY(-1px);
+          box-shadow: 0 2px 8px rgba(16, 185, 129, 0.15);
+        }
+        .action-button:active {
+          transform: translateY(0);
+        }
+        .button-content {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .app-icon {
+          width: 20px;
+          height: 20px;
+          background: white;
           border-radius: 4px;
-          font-size: 10px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 14px;
+          line-height: 1;
+          overflow: hidden;
+        }
+        .app-icon img {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+        }
+        .button-text {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          line-height: 1.2;
+        }
+        .button-main {
+          font-weight: 600;
+          color: #1a1a1a;
+        }
+        .button-sub {
+          font-size: 12px;
           color: #666;
-          font-weight: 500;
-          letter-spacing: 0.3px;
-          text-transform: uppercase;
-          white-space: nowrap;
-          flex-shrink: 0;
+          font-weight: normal;
+        }
+        .dropdown-arrow {
+          font-size: 10px;
+          color: #999;
+        }
+        .dropdown-menu {
+          position: absolute;
+          top: calc(100% + 4px);
+          right: 0;
+          background: white;
+          border-radius: 8px;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+          padding: 4px 0;
+          min-width: 200px;
+          display: none;
+          z-index: 100;
+        }
+        .dropdown-menu.show {
+          display: block;
+        }
+        .dropdown-item {
+          padding: 10px 16px;
+          cursor: pointer;
+          transition: background 0.15s;
+          font-size: 14px;
+          color: #333;
+          border: none;
+          background: none;
+          width: 100%;
+          text-align: left;
+          -webkit-app-region: no-drag;
+        }
+        .dropdown-item:hover {
+          background: #f5f5f5;
+        }
+        .dropdown-divider {
+          height: 1px;
+          background: #e5e5e5;
+          margin: 4px 0;
         }
       </style>
     </head>
     <body>
-      <div class="notification">
-        <button class="close-btn" id="closeBtn">✕</button>
-        <div class="notification-content">
-          <div class="notification-icon">🔴</div>
-          <div class="notification-text">
-            <div class="notification-header">
-              <span class="platform-badge" id="platformBadge">${data.platform || 'MEETING'}</span>
-              <h3 id="notificationTitle">${data.title || 'Meeting Detected'}</h3>
-            </div>
-            <p id="notificationBody">${data.body || 'Click to start recording'}</p>
+      <div class="notification-wrapper">
+        <button class="close-btn" id="closeBtn">×</button>
+        <div class="notification">
+          <div class="accent-bar"></div>
+          <div class="notification-body">
+          <div class="meeting-info">
+            <div class="meeting-title">${data.title || 'Meeting Detected'}</div>
+            <div class="meeting-time">${meetingTime ? (meetingTime + (endTime ? ' - ' + endTime : '')) : (data.body || '')}</div>
           </div>
-          <button class="btn-primary" id="actionBtn">${data.actionText || 'Start Recording'}</button>
+          <div class="action-container">
+            <button class="action-button" id="actionBtn">
+              <div class="button-content">
+                <div class="app-icon">${platformLogo ? `<img src="${platformLogo}" alt="${platformName}" />` : platformIcon}</div>
+                <div class="button-text">
+                  <div class="button-main">Join Meeting</div>
+                  <div class="button-sub">& open Nex</div>
+                </div>
+              </div>
+              <span class="dropdown-arrow">▼</span>
+            </button>
+            <div class="dropdown-menu" id="dropdownMenu">
+              <button class="dropdown-item" id="joinMeetingBtn">Join Meeting</button>
+              <button class="dropdown-item" id="openNexBtn">Open Nex</button>
+            </div>
+          </div>
+        </div>
         </div>
       </div>
       <script>
-        const { ipcRenderer } = require('electron');
+        const { ipcRenderer, shell } = require('electron');
+        const meetingData = ${JSON.stringify(data.meeting || null)};
+        const isCalendarMeeting = ${isCalendarMeeting ? 'true' : 'false'};
+        let dropdownOpen = false;
+
+        // Close button
         document.getElementById('closeBtn').addEventListener('click', () => {
           ipcRenderer.send('close-notification');
         });
-        document.getElementById('actionBtn').addEventListener('click', () => {
-          ipcRenderer.send('notification-action', 'start-recording');
+
+        // Main action button - both open URL and start recording
+        document.getElementById('actionBtn').addEventListener('click', (e) => {
+          e.stopPropagation();
+
+          // Check if alt/option key is pressed for dropdown
+          if (e.altKey || e.metaKey) {
+            const dropdown = document.getElementById('dropdownMenu');
+            dropdownOpen = !dropdownOpen;
+            if (dropdownOpen) {
+              dropdown.classList.add('show');
+            } else {
+              dropdown.classList.remove('show');
+            }
+          } else {
+            // Default action - open URL and start recording
+            if (meetingData && meetingData.videoMeetingUrl) {
+              shell.openExternal(meetingData.videoMeetingUrl);
+            }
+            if (isCalendarMeeting && meetingData) {
+              ipcRenderer.send('notification-action', 'start-calendar-recording', meetingData);
+            } else {
+              ipcRenderer.send('notification-action', 'start-recording');
+            }
+            ipcRenderer.send('close-notification');
+          }
+        });
+
+        // Join Meeting option - only open URL
+        document.getElementById('joinMeetingBtn').addEventListener('click', () => {
+          if (meetingData && meetingData.videoMeetingUrl) {
+            shell.openExternal(meetingData.videoMeetingUrl);
+          }
           ipcRenderer.send('close-notification');
         });
+
+        // Open Nex option - only start recording in Nex
+        document.getElementById('openNexBtn').addEventListener('click', () => {
+          if (isCalendarMeeting && meetingData) {
+            ipcRenderer.send('notification-action', 'start-calendar-recording', meetingData);
+          } else {
+            ipcRenderer.send('notification-action', 'start-recording');
+          }
+          ipcRenderer.send('close-notification');
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', () => {
+          if (dropdownOpen) {
+            document.getElementById('dropdownMenu').classList.remove('show');
+            dropdownOpen = false;
+          }
+        });
+
+        // Auto-close after 60 seconds
         setTimeout(() => {
           ipcRenderer.send('close-notification');
-        }, 60000); // 60 seconds = 1 minute
+        }, 60000);
       </script>
     </body>
     </html>
@@ -314,20 +545,24 @@ const createNotificationWindow = (data = {}) => {
   notificationWindow.loadURL(dataUrl);
 
   // Send notification data once the window is ready
-  notificationWindow.webContents.on('did-finish-load', () => {
-    console.log('Notification window loaded, sending data');
-    notificationWindow.webContents.send('notification-data', data);
-  });
+  if (notificationWindow && notificationWindow.webContents) {
+    notificationWindow.webContents.on('did-finish-load', () => {
+      console.log('Notification window loaded, sending data');
+      if (notificationWindow && !notificationWindow.isDestroyed()) {
+        notificationWindow.webContents.send('notification-data', data);
+      }
+    });
+
+    // Add error event listener
+    notificationWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+      console.error('Failed to load notification window:', errorCode, errorDescription);
+    });
+  }
 
   // Handle notification closed
   notificationWindow.on('closed', () => {
     console.log('Notification window closed');
     notificationWindow = null;
-  });
-
-  // Add error event listener
-  notificationWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
-    console.error('Failed to load notification window:', errorCode, errorDescription);
   });
 
   // Make window click-through for dragging but keep buttons clickable
@@ -514,9 +749,9 @@ app.whenReady().then(async () => {
     }
   });
 
-  ipcMain.on('notification-action', async (event, action) => {
+  ipcMain.on('notification-action', async (event, action, meetingData) => {
     if (action === 'start-recording') {
-      // Join the detected meeting when user clicks "Start Recording"
+      // Join the detected meeting when user clicks "Start Recording" for ad-hoc meetings
       const result = await joinDetectedMeeting();
 
       // Bring main window to front
@@ -524,6 +759,18 @@ app.whenReady().then(async () => {
         if (mainWindow.isMinimized()) mainWindow.restore();
         mainWindow.show();
         mainWindow.focus();
+      }
+    } else if (action === 'start-calendar-recording' && meetingData) {
+      console.log('Starting calendar meeting recording for:', meetingData.title);
+
+      // Bring main window to front
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.show();
+        mainWindow.focus();
+
+        // Send event to renderer to open the calendar meeting
+        mainWindow.webContents.send('open-calendar-meeting', meetingData);
       }
     }
   });
@@ -921,15 +1168,9 @@ function initSDK() {
     }
   });
 
-  // Helper function to send in-app notification
+  // Helper function to send in-app notification - removed, using custom notification window instead
   const sendInAppNotification = (platformName) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      // Bring app to focus
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.focus();
-
-      // In-app notification removed - using custom window notification instead
-    }
+    // No longer used - custom notification window handles all notifications
   };
 
   // Check if a detected meeting window is part of a calendar meeting
@@ -1020,8 +1261,8 @@ function initSDK() {
       console.log(`First detection for ad-hoc meeting session ${meetingSessionKey}, showing notification`);
       handledMeetingSessions.add(meetingSessionKey);
       createNotificationWindow({
-        title: 'Meeting Detected',
-        body: `${platformName} meeting found. Click to start recording.`,
+        title: `${platformName} Meeting Detected`,
+        body: 'Click to start recording.',
         platform: platformName,
         actionText: 'Start Recording'
       });
@@ -1036,79 +1277,8 @@ function initSDK() {
 
   // Listen for meeting detected events
   RecallAiSdk.addEventListener('meeting-detected', async (evt) => {
+    // Use handleMeetingDetected which creates the custom notification window
     handleMeetingDetected(evt);
-
-    // Log the meeting detected event
-    sdkLogger.logEvent('meeting-detected', {
-      platform: evt.window.platform,
-      windowId: evt.window.id
-    });
-
-    detectedMeeting = evt;
-
-    // Map platform codes to readable names
-    const platformNames = {
-      'zoom': 'Zoom',
-      'google-meet': 'Google Meet',
-      'slack': 'Slack',
-      'teams': 'Microsoft Teams'
-    };
-
-    // Get a user-friendly platform name, or use the raw platform name if not in our map
-    const platformName = platformNames[evt.window.platform] || evt.window.platform;
-
-    // Try to send a system notification using standard Electron API
-    if (Notification.isSupported()) {
-      try {
-        console.log('Creating notification for platform:', platformName);
-
-        // Keep a reference to prevent garbage collection
-        const notification = new Notification({
-          title: '🔴 Meeting Detected',
-          subtitle: platformName, // macOS-specific
-          body: `${platformName} meeting found. Click to start recording.`,
-          silent: false,
-          urgency: 'critical', // Linux, but doesn't hurt on macOS
-          timeoutType: 'never', // Keep notification visible
-          hasReply: false, // macOS-specific
-          closeButtonText: 'Dismiss' // macOS-specific
-        });
-
-        // Store reference globally to prevent GC
-        global.lastNotification = notification;
-
-        notification.on('click', () => {
-          console.log("Notification clicked for platform:", platformName);
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            if (mainWindow.isMinimized()) mainWindow.restore();
-            mainWindow.focus();
-          }
-          joinDetectedMeeting();
-        });
-
-        notification.on('show', () => {
-          console.log('Meeting notification shown successfully');
-
-          // Also bring the app to attention
-          if (app.dock) {
-            app.dock.bounce('critical'); // macOS dock bounce
-          }
-        });
-
-        notification.on('failed', (event, error) => {
-          console.error('Meeting notification failed:', error);
-        });
-
-        notification.show();
-      } catch (error) {
-        console.error('Error creating meeting notification:', error);
-      }
-    } else {
-      console.log('Notifications are not supported on this system');
-    }
-
-    // Always send in-app notification as fallback
-    sendInAppNotification(platformName);
 
     // Send the meeting detected status to the renderer process
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -1529,14 +1699,21 @@ ipcMain.handle('startManualRecording', async (event, meetingId) => {
     const fileData = await fs.promises.readFile(meetingsFilePath, 'utf8');
     const meetingsData = JSON.parse(fileData);
 
-    // Find the meeting
-    const pastMeetingIndex = meetingsData.pastMeetings.findIndex(meeting => meeting.id === meetingId);
+    // Find the meeting in both past and upcoming meetings
+    let meeting = meetingsData.pastMeetings.find(m => m.id === meetingId);
+    let meetingList = meetingsData.pastMeetings;
 
-    if (pastMeetingIndex === -1) {
-      return { success: false, error: 'Meeting not found' };
+    if (!meeting) {
+      meeting = meetingsData.upcomingMeetings.find(m => m.id === meetingId);
+      meetingList = meetingsData.upcomingMeetings;
     }
 
-    const meeting = meetingsData.pastMeetings[pastMeetingIndex];
+    if (!meeting) {
+      console.error(`Meeting not found with ID: ${meetingId}`);
+      console.log('Available past meetings:', meetingsData.pastMeetings.map(m => m.id));
+      console.log('Available upcoming meetings:', meetingsData.upcomingMeetings.map(m => m.id));
+      return { success: false, error: 'Meeting not found' };
+    }
 
     try {
       // Prepare desktop audio recording - this is the key difference from our previous implementation
@@ -1700,14 +1877,26 @@ ipcMain.handle('generateMeetingSummaryStreaming', async (event, meetingId) => {
     const fileData = await fs.promises.readFile(meetingsFilePath, 'utf8');
     const meetingsData = JSON.parse(fileData);
 
-    // Find the meeting
-    const pastMeetingIndex = meetingsData.pastMeetings.findIndex(meeting => meeting.id === meetingId);
+    // Find the meeting in both past and upcoming meetings
+    let pastMeetingIndex = meetingsData.pastMeetings.findIndex(meeting => meeting.id === meetingId);
+    let upcomingMeetingIndex = -1;
+    let meeting;
+    let meetingList;
 
-    if (pastMeetingIndex === -1) {
-      return { success: false, error: 'Meeting not found' };
+    if (pastMeetingIndex !== -1) {
+      meeting = meetingsData.pastMeetings[pastMeetingIndex];
+      meetingList = 'pastMeetings';
+    } else {
+      upcomingMeetingIndex = meetingsData.upcomingMeetings.findIndex(meeting => meeting.id === meetingId);
+      if (upcomingMeetingIndex !== -1) {
+        meeting = meetingsData.upcomingMeetings[upcomingMeetingIndex];
+        meetingList = 'upcomingMeetings';
+      }
     }
 
-    const meeting = meetingsData.pastMeetings[pastMeetingIndex];
+    if (!meeting) {
+      return { success: false, error: 'Meeting not found' };
+    }
 
     // Check if there's a transcript to summarize
     if (!meeting.transcript || meeting.transcript.length === 0) {
@@ -2164,15 +2353,28 @@ async function processTranscriptData(evt) {
 
     // Use the file operation manager to safely update the meetings data
     await fileOperationManager.scheduleOperation(async (meetingsData) => {
-      // Find the meeting note with this ID
-      const noteIndex = meetingsData.pastMeetings.findIndex(meeting => meeting.id === noteId);
-      if (noteIndex === -1) {
-        console.log(`No meeting note found with ID: ${noteId}`);
+      // Find the meeting note with this ID in both past and upcoming meetings
+      let noteIndex = meetingsData.pastMeetings.findIndex(meeting => meeting.id === noteId);
+      let meeting;
+      let meetingList;
+
+      if (noteIndex !== -1) {
+        meeting = meetingsData.pastMeetings[noteIndex];
+        meetingList = 'pastMeetings';
+      } else {
+        noteIndex = meetingsData.upcomingMeetings.findIndex(meeting => meeting.id === noteId);
+        if (noteIndex !== -1) {
+          meeting = meetingsData.upcomingMeetings[noteIndex];
+          meetingList = 'upcomingMeetings';
+        }
+      }
+
+      if (!meeting) {
+        console.log(`No meeting note found with ID: ${noteId} in past or upcoming meetings`);
         return null; // Return null to indicate no changes needed
       }
 
       // Add the transcript data
-      const meeting = meetingsData.pastMeetings[noteIndex];
 
       // Initialize transcript array if it doesn't exist
       if (!meeting.transcript) {

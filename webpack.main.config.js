@@ -1,3 +1,6 @@
+const webpack = require('webpack');
+require('dotenv').config();
+
 module.exports = {
   /**
    * This is the main entry point for your application, it's the first file
@@ -10,5 +13,19 @@ module.exports = {
   },
   externals: {
     '@recallai/desktop-sdk': 'commonjs @recallai/desktop-sdk'
-  }
+  },
+  plugins: [
+    new webpack.DefinePlugin({
+      'process.env.NEX_API_URL': JSON.stringify(process.env.NEX_API_URL),
+      'process.env.NEX_WEB_URL': JSON.stringify(process.env.NEX_WEB_URL),
+      'process.env.NEX_OAUTH_CLIENT_ID': JSON.stringify(process.env.NEX_OAUTH_CLIENT_ID),
+      'process.env.NEX_OAUTH_REDIRECT_URI': JSON.stringify(process.env.NEX_OAUTH_REDIRECT_URI),
+      'process.env.NEX_OAUTH_SCOPE': JSON.stringify(process.env.NEX_OAUTH_SCOPE),
+      'process.env.RECALLAI_API_URL': JSON.stringify(process.env.RECALLAI_API_URL),
+      'process.env.RECALLAI_API_KEY': JSON.stringify(process.env.RECALLAI_API_KEY),
+      'process.env.OPENROUTER_KEY': JSON.stringify(process.env.OPENROUTER_KEY),
+      'process.env.GEMINI_API_KEY': JSON.stringify(process.env.GEMINI_API_KEY),
+      'process.env.SHOW_DEBUG_PANEL': JSON.stringify(process.env.SHOW_DEBUG_PANEL)
+    })
+  ]
 };

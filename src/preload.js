@@ -35,6 +35,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onVideoFrame: (callback) => ipcRenderer.on('video-frame', (_, data) => callback(data)),
   onMeetingDetectionStatus: (callback) => ipcRenderer.on('meeting-detection-status', (_, data) => callback(data)),
   onInAppNotification: (callback) => ipcRenderer.on('show-in-app-notification', (_, data) => callback(data)),
+  onOpenCalendarMeeting: (callback) => ipcRenderer.on('open-calendar-meeting', (_, data) => callback(data)),
   getActiveRecordingId: (noteId) => ipcRenderer.invoke('getActiveRecordingId', noteId),
 
   // Authentication APIs
@@ -53,6 +54,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   calendar: {
     getUpcomingMeetings: (hours) => ipcRenderer.invoke('calendar:getUpcomingMeetings', hours),
     getMeetingDetails: (eventId) => ipcRenderer.invoke('calendar:getMeetingDetails', eventId),
+    onCalendarSynced: (callback) => ipcRenderer.on('calendar:synced', (_, meetings) => callback(meetings)),
+    onMeetingStarting: (callback) => ipcRenderer.on('meeting:starting', (_, meeting) => callback(meeting)),
+    onMeetingInProgress: (callback) => ipcRenderer.on('meeting:inProgress', (_, meeting) => callback(meeting)),
   },
 
   // Settings APIs

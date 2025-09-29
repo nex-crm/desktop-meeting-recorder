@@ -95,6 +95,60 @@ class NexAuthService {
 - Corrected sidebar toggle button behavior
 - Proper state management across views
 
+### ✅ Phase 3: Custom Notification System (COMPLETED)
+
+#### Always-On-Top Notifications
+- Custom notification window bypasses Do Not Disturb mode
+- Clean, minimal macOS-style design
+- Positioned in top-right corner (non-intrusive)
+- 60-second display duration with auto-dismiss
+- Smooth slide-in animation
+
+#### Smart Meeting Detection Logic
+```javascript
+// Key implementation features:
+- Session tracking with handledMeetingSessions Set
+- Unique key: platform + window ID
+- Notification shown only on first detection
+- No duplicate notifications during recording lifecycle
+- Session cleared only on meeting close (not recording stop)
+```
+
+#### Duplicate Prevention
+- Prevents multiple notifications for same meeting
+- Checks for existing notes before creating new ones
+- Maintains tracking across recording stop/start cycles
+- Proper cleanup on meeting window close
+
+### ✅ Phase 4: Calendar Integration (COMPLETED)
+
+#### Calendar Meetings Display
+- **"Coming Up" Section**: Shows upcoming meetings from calendar
+- **Today's View by Default**: Only displays today's meetings initially
+- **"Show more/less" Toggle**: Expands to show full week's meetings
+- **Date Badges**: Visual date indicators for each meeting
+
+#### Future Meeting Handling
+```javascript
+// Smart time-based UI changes:
+- Future meetings > 2 hours away: Show "Starts at [time]"
+- Future meetings within 2 hours: Show "Start now" button
+- Past/current meetings: Show recording controls
+- Dynamic UI updates based on meeting time
+```
+
+#### Meeting Notes Management
+- **Click to Create**: Clicking upcoming meeting creates note automatically
+- **Future Note Separation**: Future meeting notes excluded from past notes list
+- **isFuture Flag**: Tracks meeting state for proper categorization
+- **Seamless Transition**: Notes move from upcoming to past after meeting time
+
+#### UI Enhancements
+- **Future Meeting Indicator**: Bottom overlay showing meeting start time
+- **Start Now Button**: One-click recording for imminent meetings
+- **Recording Controls**: Auto-hide for future meetings
+- **Responsive Design**: Clean, Granola-inspired interface
+
 ## Current Features
 
 ### Working Functionality
@@ -104,6 +158,12 @@ class NexAuthService {
 4. **Storage**: Local JSON file storage for meetings
 5. **UI**: Modern interface with sidebar, cards, and controls
 6. **Debug Panel**: Optional developer tools (env flag controlled)
+7. **Custom Notifications**: Always-on-top meeting detection alerts
+8. **Smart Detection**: No duplicate notifications or notes for same meeting
+9. **Calendar Integration**: Display upcoming meetings from calendar API
+10. **Future Meeting UI**: Time-based UI changes for future vs current meetings
+11. **Smart Meeting View**: Today's meetings by default, expandable to week
+12. **Meeting Notes**: Auto-create notes for upcoming meetings on click
 
 ### Integration Points
 - Recall.ai Desktop SDK for recording
@@ -175,6 +235,10 @@ SHOW_DEBUG_PANEL=false
 - [x] UI interactions
 - [x] Sidebar functionality
 - [x] Button state changes
+- [x] Custom notification display
+- [x] Notification bypass of Do Not Disturb
+- [x] Duplicate notification prevention
+- [x] Meeting session tracking
 
 ### Testing Configuration
 ```bash

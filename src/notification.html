@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .notification {
+      background: linear-gradient(135deg, rgba(147, 51, 234, 0.95) 0%, rgba(79, 70, 229, 0.95) 100%);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 10px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 0 1px 8px rgba(0, 0, 0, 0.2);
+      -webkit-app-region: drag;
+      animation: slideIn 0.3s ease-out;
+      position: relative;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    .close-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      -webkit-app-region: no-drag;
+      cursor: pointer;
+      background: none;
+      border: none;
+      font-size: 20px;
+      color: rgba(255, 255, 255, 0.7);
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+
+    .close-btn:hover {
+      color: white;
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .notification-content {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .notification-icon {
+      font-size: 32px;
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+    }
+
+    .notification-text {
+      flex: 1;
+    }
+
+    h3 {
+      margin: 0 0 5px 0;
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+    }
+
+    p {
+      margin: 0 0 10px 0;
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+      -webkit-app-region: no-drag;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s;
+      letter-spacing: -0.2px;
+    }
+
+    .btn-primary {
+      background: white;
+      color: #7c3aed;
+    }
+
+    .btn-primary:hover {
+      background: rgba(255, 255, 255, 0.95);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      backdrop-filter: blur(10px);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .platform-badge {
+      display: inline-flex;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.2);
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      color: white;
+      margin-bottom: 8px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+  <div class="notification">
+    <button class="close-btn" id="closeBtn">✕</button>
+    <div class="notification-content">
+      <div class="notification-icon">🔴</div>
+      <div class="notification-text">
+        <div class="platform-badge" id="platformBadge">MEETING DETECTED</div>
+        <h3 id="notificationTitle">Meeting Detected</h3>
+        <p id="notificationBody">A meeting has been detected. Would you like to start recording?</p>
+        <div class="button-group">
+          <button class="btn btn-primary" id="actionBtn">Start Recording</button>
+          <button class="btn btn-secondary" id="dismissBtn">Not Now</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+
+    // Handle close button
+    document.getElementById('closeBtn').addEventListener('click', () => {
+      ipcRenderer.send('close-notification');
+    });
+
+    // Handle dismiss button
+    document.getElementById('dismissBtn').addEventListener('click', () => {
+      ipcRenderer.send('close-notification');
+    });
+
+    // Handle action button
+    document.getElementById('actionBtn').addEventListener('click', () => {
+      ipcRenderer.send('notification-action', 'start-recording');
+      ipcRenderer.send('close-notification');
+    });
+
+    // Listen for notification data
+    ipcRenderer.on('notification-data', (event, data) => {
+      if (data.title) {
+        document.getElementById('notificationTitle').textContent = data.title;
+      }
+      if (data.body) {
+        document.getElementById('notificationBody').textContent = data.body;
+      }
+      if (data.platform) {
+        document.getElementById('platformBadge').textContent = data.platform.toUpperCase();
+      }
+      if (data.actionText) {
+        document.getElementById('actionBtn').textContent = data.actionText;
+      }
+    });
+
+    // Auto-close after 10 seconds
+    setTimeout(() => {
+      ipcRenderer.send('close-notification');
+    }, 10000);
+  </script>
+</body>
+</html>

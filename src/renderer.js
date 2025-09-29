@@ -462,9 +462,407 @@ function debounce(func, wait) {
   };
 }
 
+// Unified Recording Pill Component Function
+function createRecordingPill(meeting, context = 'notes') {
+  // context can be 'notes', 'calendar', or 'editor'
+  const pill = document.createElement('div');
+  pill.className = 'recording-pill unified-pill';
+
+  const hasActiveRecording = window.isRecording && window.currentRecordingId && window.currentMeetingId === meeting.id;
+  const now = new Date();
+  const startTime = meeting.startTime ? new Date(meeting.startTime) : null;
+  const isFuture = startTime && startTime > now;
+  const hoursUntilMeeting = isFuture ? (startTime - now) / (1000 * 60 * 60) : 0;
+  const hasTranscript = meeting.transcript && meeting.transcript.length > 0;
+
+  // Format meeting time
+  const timeStr = startTime ? startTime.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  }).replace(' ', '').toLowerCase() : '';
+
+  let pillContent = '';
+
+  if (hasActiveRecording) {
+    // Recording is active - don't show summarize button during recording
+    pillContent = `
+      <div class="meeting-time-info">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="8" fill="#ff4444"/>
+        </svg>
+        <span>Recording in progress</span>
+      </div>
+    `;
+  } else if (isFuture && hoursUntilMeeting <= 2) {
+    // Meeting starts within 2 hours - show time and auto-summarize if has transcript and not recording
+    pillContent = `
+      <div class="meeting-time-info">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z" fill="currentColor"/>
+          <path d="M12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67z" fill="currentColor"/>
+        </svg>
+        <span>Starts ${timeStr}</span>
+      </div>
+      ${hasTranscript && !window.isRecording ? `
+        <div class="pill-actions">
+          <button class="generate-btn auto-btn" data-meeting-id="${meeting.id}">
+            Auto
+          </button>
+        </div>
+      ` : ''}
+    `;
+  } else if (isFuture) {
+    // Meeting starts later - just show the time
+    pillContent = `
+      <div class="meeting-time-info">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z" fill="currentColor"/>
+          <path d="M12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67z" fill="currentColor"/>
+        </svg>
+        <span>Starts at ${timeStr}</span>
+      </div>
+      ${hasTranscript && !window.isRecording ? `
+        <div class="pill-actions">
+          <button class="generate-btn auto-btn" data-meeting-id="${meeting.id}">
+            Auto
+          </button>
+        </div>
+      ` : ''}
+    `;
+  } else {
+    // Past meeting or no time - show only auto-summarize if has transcript and not recording
+    pillContent = `
+      ${hasTranscript && !window.isRecording ? `
+        <div class="pill-actions">
+          <button class="generate-btn auto-btn" data-meeting-id="${meeting.id}">
+            Auto
+          </button>
+        </div>
+      ` : ''}
+    `;
+  }
+
+  pill.innerHTML = pillContent;
+
+  // Add event listeners after setting innerHTML
+  const autoBtn = pill.querySelector('.auto-btn');
+  if (autoBtn) {
+    autoBtn.addEventListener('click', function() {
+      const meetingId = this.getAttribute('data-meeting-id');
+      generateSummaryForMeeting(meetingId);
+    });
+  }
+
+  return pill;
+}
+
+// Global functions for recording pill actions
+window.startRecordingForMeeting = async function(meetingId) {
+  console.log('Starting recording for meeting:', meetingId);
+  currentEditingMeetingId = meetingId;
+
+  try {
+    const result = await window.electronAPI.startManualRecording(meetingId);
+    if (result.success) {
+      console.log('Recording started successfully:', result.recordingId);
+      window.isRecording = true;
+      window.currentRecordingId = result.recordingId;
+      window.currentMeetingId = meetingId;
+
+      // Refresh all recording pills
+      updateAllRecordingPills();
+    } else {
+      console.error('Failed to start recording:', result.error);
+      alert('Failed to start recording: ' + result.error);
+    }
+  } catch (error) {
+    console.error('Error starting recording:', error);
+    alert('Error starting recording: ' + error.message);
+  }
+};
+
+window.stopRecordingForMeeting = async function(meetingId) {
+  console.log('Stopping recording for meeting:', meetingId);
+  if (window.isRecording && window.currentRecordingId) {
+    try {
+      const result = await window.electronAPI.stopManualRecording(window.currentRecordingId);
+      if (result.success) {
+        console.log('Recording stopped successfully');
+        // The UI will be updated by the recording state change event
+      } else {
+        console.error('Failed to stop recording:', result.error);
+      }
+    } catch (error) {
+      console.error('Error stopping recording:', error);
+    }
+  }
+};
+
+window.generateSummaryForMeeting = async function(meetingId) {
+  console.log('Generating summary for meeting:', meetingId);
+
+  // Show loading state
+  const buttons = document.querySelectorAll(`.auto-btn[data-meeting-id="${meetingId}"]`);
+  buttons.forEach(btn => {
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+  });
+
+  try {
+    sdkLogger.log('Auto button: Requesting AI summary generation for meeting: ' + meetingId);
+    const result = await window.electronAPI.generateMeetingSummaryStreaming(meetingId);
+
+    if (result.success) {
+      console.log('Summary generation completed');
+      // The UI will be updated by the summary update events
+    } else {
+      console.error('Failed to generate summary:', result.error);
+      alert('Failed to generate summary. Please try again.');
+    }
+  } catch (error) {
+    console.error('Error generating summary:', error);
+    alert('Error generating summary: ' + error.message);
+  } finally {
+    // Reset button state
+    buttons.forEach(btn => {
+      btn.disabled = false;
+      btn.textContent = 'Auto';
+    });
+  }
+};
+
+// Function to update all recording pills when state changes
+function updateAllRecordingPills() {
+  // Update future meeting indicator if exists
+  const futureMeetingIndicator = document.getElementById('futureMeetingIndicator');
+  if (futureMeetingIndicator && currentEditingMeetingId) {
+    const meetingsData = window.electronAPI.loadMeetingsData();
+    meetingsData.then(data => {
+      const meeting = [...(data.upcomingMeetings || []), ...(data.pastMeetings || [])]
+        .find(m => m.id === currentEditingMeetingId);
+      if (meeting) {
+        const pill = createRecordingPill(meeting, 'editor');
+        futureMeetingIndicator.innerHTML = '';
+        futureMeetingIndicator.appendChild(pill);
+      }
+    });
+  }
+
+  // Update calendar view pills if visible
+  const calendarView = document.querySelector('.calendar-view');
+  if (calendarView && calendarView.style.display !== 'none') {
+    // Re-render calendar section
+    const calendarBtn = document.querySelector('.nav-btn[data-view="calendar"]');
+    if (calendarBtn) {
+      calendarBtn.click();
+    }
+  }
+}
+
+// Function to handle "Start now" button for future meetings (backward compatibility)
+window.startRecordingNow = async function() {
+  console.log('Starting recording for future meeting');
+
+  // For future meetings, we need to start recording directly
+  if (!currentEditingMeetingId) {
+    console.error('No meeting currently being edited');
+    return;
+  }
+
+  try {
+    const result = await window.electronAPI.startManualRecording(currentEditingMeetingId);
+    if (result.success) {
+      console.log('Recording started successfully:', result.recordingId);
+      window.isRecording = true;
+      window.currentRecordingId = result.recordingId;
+      window.currentMeetingId = currentEditingMeetingId;
+
+      // Update the UI by refreshing the future meeting indicator
+      const futureMeetingIndicator = document.getElementById('futureMeetingIndicator');
+      if (futureMeetingIndicator) {
+        futureMeetingIndicator.innerHTML = `
+          <div class="meeting-time-info">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="12" cy="12" r="8" fill="#ff4444"/>
+            </svg>
+            <span>Recording in progress</span>
+          </div>
+          <button class="stop-recording-btn" data-action="stop-recording">
+            Stop Recording
+          </button>
+        `;
+
+        // Add event listener for stop button
+        const stopBtn = futureMeetingIndicator.querySelector('.stop-recording-btn');
+        if (stopBtn) {
+          stopBtn.addEventListener('click', () => {
+            window.stopCurrentRecording();
+          });
+        }
+      }
+    } else {
+      console.error('Failed to start recording:', result.error);
+      alert('Failed to start recording: ' + result.error);
+    }
+  } catch (error) {
+    console.error('Error starting recording:', error);
+    alert('Error starting recording: ' + error.message);
+  }
+};
+
+// Function to handle "Stop Recording" button for future meetings that have started recording
+window.stopCurrentRecording = async function() {
+  console.log('Stopping recording from future meeting indicator');
+  if (window.isRecording && window.currentRecordingId) {
+    try {
+      const result = await window.electronAPI.stopManualRecording(window.currentRecordingId);
+      if (result.success) {
+        console.log('Recording stopped successfully');
+        // The UI will be updated by the recording state change event
+      } else {
+        console.error('Failed to stop recording:', result.error);
+      }
+    } catch (error) {
+      console.error('Error stopping recording:', error);
+    }
+  }
+};
+
 
 
 // Function to create meeting card elements
+// Create upcoming meeting card (for Coming up section)
+function createUpcomingMeetingCard(meeting) {
+  const card = document.createElement('div');
+  card.className = 'upcoming-meeting-card';
+
+  // Parse the meeting date
+  const meetingDate = new Date(meeting.startTime || meeting.date);
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  // Format time (e.g., "9:30")
+  const timeStr = meetingDate.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: false
+  });
+
+  // Format day (Today, Tomorrow, or day name)
+  let dayStr;
+  if (meetingDate.toDateString() === now.toDateString()) {
+    dayStr = 'Today';
+  } else if (meetingDate.toDateString() === tomorrow.toDateString()) {
+    dayStr = 'Tomorrow';
+  } else {
+    dayStr = meetingDate.toLocaleDateString('en-US', { weekday: 'long' });
+  }
+
+  // Create date badge
+  const monthStr = meetingDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+  const dayNum = meetingDate.getDate();
+
+  card.innerHTML = `
+    <div class="date-badge">
+      <div class="date-month">${monthStr}</div>
+      <div class="date-day">${dayNum}</div>
+    </div>
+    <div class="upcoming-meeting-content">
+      <div class="upcoming-meeting-title">${meeting.title || 'Untitled Meeting'}</div>
+      <div class="upcoming-meeting-time">${dayStr} ${timeStr}</div>
+    </div>
+  `;
+
+  card.addEventListener('click', async () => {
+    console.log('Upcoming meeting clicked:', meeting);
+
+    // Check if a note already exists for this meeting
+    let existingNote = [...pastMeetings, ...upcomingMeetings].find(m =>
+      m.id === meeting.id || m.calendarEventId === meeting.id
+    );
+
+    if (!existingNote) {
+      // Create a new note for this meeting
+      existingNote = {
+        id: `meeting_${Date.now()}`,
+        calendarEventId: meeting.id,
+        title: meeting.title || 'Untitled Meeting',
+        date: meeting.startTime || meeting.date,
+        startTime: meeting.startTime,
+        endTime: meeting.endTime,
+        type: 'calendar',
+        subtitle: meeting.organizerEmail || '',
+        content: '',
+        attendees: meeting.attendees || [],
+        location: meeting.location,
+        videoMeetingUrl: meeting.videoMeetingUrl,
+        isFuture: true // Mark as future meeting
+      };
+
+      // Add to upcomingMeetings (not pastMeetings for future meetings)
+      upcomingMeetings.push(existingNote);
+      meetingsData.upcomingMeetings.push(existingNote);
+
+      // Save to file
+      await window.electronAPI.saveMeetingsData(meetingsData);
+    }
+
+    // Open the note (either existing or newly created)
+    showEditorView(existingNote.id, true); // Pass true to indicate it's a future meeting
+  });
+
+  return card;
+}
+
+// Create meeting card with time (for date-grouped notes)
+function createMeetingCardWithTime(meeting) {
+  const card = document.createElement('div');
+  card.className = 'meeting-card-with-time';
+  card.dataset.id = meeting.id;
+
+  // Format time
+  const meetingDate = new Date(meeting.date);
+  const timeStr = meetingDate.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: false
+  });
+
+  let iconHtml = `
+    <div class="meeting-icon document">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M14 2H6C4.9 2 4.01 2.9 4.01 4L4 20C4 21.1 4.89 22 5.99 22H18C19.1 22 20 21.1 20 20V8L14 2ZM16 18H8V16H16V18ZM16 14H8V12H16V14ZM13 9V3.5L18.5 9H13Z" fill="#9CA3AF"/>
+      </svg>
+    </div>
+  `;
+
+  // Extract participant names if available
+  let subtitle = meeting.subtitle;
+  if (meeting.participants && meeting.participants.length > 0) {
+    subtitle = meeting.participants.map(p => p.name).join(', ');
+  }
+
+  card.innerHTML = `
+    ${iconHtml}
+    <div class="meeting-content">
+      <div class="meeting-title">${meeting.title}</div>
+      <div class="meeting-subtitle">${subtitle || ''}</div>
+    </div>
+    <div class="meeting-time-right">
+      <span class="time-text">${timeStr}</span>
+      <button class="delete-meeting-btn" data-id="${meeting.id}" title="Delete note">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" fill="currentColor"/>
+        </svg>
+      </button>
+    </div>
+  `;
+
+  return card;
+}
+
 function createMeetingCard(meeting) {
   const card = document.createElement('div');
   card.className = 'meeting-card';
@@ -663,8 +1061,8 @@ function showHomeView() {
 }
 
 // Function to show editor view
-function showEditorView(meetingId) {
-  console.log(`Showing editor view for meeting ID: ${meetingId}`);
+function showEditorView(meetingId, isFutureMeeting = false) {
+  console.log(`Showing editor view for meeting ID: ${meetingId}, Future: ${isFutureMeeting}`);
 
   // Make the views visible/hidden
   document.getElementById('homeView').style.display = 'none';
@@ -778,8 +1176,105 @@ function showEditorView(meetingId) {
     // Add event listener to the title
     setupTitleEditing();
 
-    // Check if this note has an active recording and update the record button
-    checkActiveRecordingState();
+    // Handle future meeting UI
+    const floatingControls = document.querySelector('.floating-controls');
+    if (meeting && meeting.startTime) {
+      const startTime = new Date(meeting.startTime);
+      const now = new Date();
+      const timeDiff = startTime - now;
+      const hoursUntilMeeting = timeDiff / (1000 * 60 * 60);
+
+      if (timeDiff > 0) {
+        // This is a future meeting
+        console.log(`Future meeting starts in ${hoursUntilMeeting.toFixed(1)} hours`);
+
+        // Always show floating controls for future meetings
+        if (floatingControls) {
+          floatingControls.style.display = 'flex';
+
+          // Add meeting time to the floating controls for all future meetings
+          const timeStr = startTime.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          }).replace(' ', '').toLowerCase();
+
+          // Create or update meeting time display in floating controls
+          let timeDisplay = floatingControls.querySelector('.meeting-time-display');
+          if (!timeDisplay) {
+            timeDisplay = document.createElement('div');
+            timeDisplay.className = 'meeting-time-display';
+            floatingControls.insertBefore(timeDisplay, floatingControls.firstChild);
+          }
+          timeDisplay.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z" fill="currentColor"/>
+              <path d="M12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67z" fill="currentColor"/>
+            </svg>
+            <span>Starts ${timeStr}</span>
+          `;
+
+          // Hide recording buttons for meetings more than 2 hours away
+          const controlButtons = floatingControls.querySelector('.control-buttons');
+          if (controlButtons) {
+            if (hoursUntilMeeting > 2) {
+              controlButtons.style.display = 'none';
+            } else {
+              controlButtons.style.display = 'flex';
+            }
+          }
+        }
+
+        // Hide the future meeting indicator pill since we're showing time in floating controls
+        const indicator = document.getElementById('futureMeetingIndicator');
+        if (indicator) {
+          indicator.style.display = 'none';
+        }
+
+        // Check if this note has an active recording and update the record button (for meetings within 2 hours)
+        if (hoursUntilMeeting <= 2) {
+          checkActiveRecordingState();
+        }
+      } else {
+        // This is a current or past meeting
+        // Remove future meeting indicator if it exists
+        const indicator = document.getElementById('futureMeetingIndicator');
+        if (indicator) {
+          indicator.style.display = 'none';
+        }
+
+        // Show recording controls and remove any meeting time display
+        if (floatingControls) {
+          floatingControls.style.display = 'flex';
+          const timeDisplay = floatingControls.querySelector('.meeting-time-display');
+          if (timeDisplay) {
+            timeDisplay.remove();
+          }
+        }
+
+        // Check if this note has an active recording and update the record button
+        checkActiveRecordingState();
+      }
+    } else {
+      // No start time, treat as regular note
+      // Remove future meeting indicator if it exists
+      const indicator = document.getElementById('futureMeetingIndicator');
+      if (indicator) {
+        indicator.style.display = 'none';
+      }
+
+      // Show recording controls and remove any meeting time display
+      if (floatingControls) {
+        floatingControls.style.display = 'flex';
+        const timeDisplay = floatingControls.querySelector('.meeting-time-display');
+        if (timeDisplay) {
+          timeDisplay.remove();
+        }
+      }
+
+      // Check if this note has an active recording and update the record button
+      checkActiveRecordingState();
+    }
 
     // Update debug panel with any available data if it's open
     const debugPanel = document.getElementById('debugPanel');
@@ -1008,37 +1503,146 @@ async function createNewMeeting() {
 }
 
 // Function to render meetings to the page
+// Store calendar meetings
+let calendarMeetings = [];
+
+// Fetch calendar meetings from API
+async function fetchCalendarMeetings() {
+  try {
+    const result = await window.electronAPI.calendar.getUpcomingMeetings(24); // Next 24 hours
+    if (result.success && result.meetings && Array.isArray(result.meetings)) {
+      console.log('Fetched', result.meetings.length, 'upcoming meetings from API');
+      calendarMeetings = result.meetings;
+
+      // Sort meetings by start time
+      calendarMeetings.sort((a, b) => {
+        const dateA = new Date(a.startTime || a.date);
+        const dateB = new Date(b.startTime || b.date);
+        return dateA - dateB;
+      });
+    } else {
+      console.log('No meetings returned from API or invalid format');
+      calendarMeetings = [];
+    }
+  } catch (error) {
+    console.error('Failed to fetch calendar meetings:', error);
+    calendarMeetings = [];
+  }
+}
+
 function renderMeetings() {
   // Clear previous content
   const mainContent = document.querySelector('.main-content .content-container');
   mainContent.innerHTML = '';
 
-  // Create all notes section (replaces both upcoming and date-grouped sections)
-  const notesSection = document.createElement('section');
-  notesSection.className = 'meetings-section';
-  notesSection.innerHTML = `
-    <h2 class="section-title">Notes</h2>
-    <div class="meetings-list" id="notes-list"></div>
-  `;
-  mainContent.appendChild(notesSection);
+  // Create "Coming up" section for upcoming meetings
+  if (calendarMeetings && calendarMeetings.length > 0) {
+    const upcomingSection = document.createElement('section');
+    upcomingSection.className = 'upcoming-section';
 
-  // Get the notes container
-  const notesContainer = notesSection.querySelector('#notes-list');
+    // Sort calendar meetings by start time
+    const sortedMeetings = [...calendarMeetings].sort((a, b) => {
+      return new Date(a.startTime) - new Date(b.startTime);
+    });
 
-  // Add all meetings to the notes section (both upcoming and past)
-  const allMeetings = [...upcomingMeetings, ...pastMeetings];
+    // Filter meetings for today and this week
+    const now = new Date();
+    const endOfToday = new Date(now);
+    endOfToday.setHours(23, 59, 59, 999);
 
-  // Sort by date, newest first
-  allMeetings.sort((a, b) => {
-    return new Date(b.date) - new Date(a.date);
+    const endOfWeek = new Date(now);
+    const daysUntilEndOfWeek = 6 - now.getDay() + 7; // Current week + next week
+    endOfWeek.setDate(now.getDate() + daysUntilEndOfWeek);
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    const todayMeetings = sortedMeetings.filter(meeting => {
+      const meetingDate = new Date(meeting.startTime);
+      return meetingDate >= now && meetingDate <= endOfToday;
+    });
+
+    const weekMeetings = sortedMeetings.filter(meeting => {
+      const meetingDate = new Date(meeting.startTime);
+      return meetingDate >= now && meetingDate <= endOfWeek;
+    });
+
+    let showingAll = false;
+    const hasMoreMeetings = weekMeetings.length > todayMeetings.length;
+
+    upcomingSection.innerHTML = `
+      <div class="section-header">
+        <h2 class="section-title">Coming up</h2>
+        ${hasMoreMeetings ? '<button class="show-more-btn" id="showMoreUpcoming">Show more</button>' : ''}
+      </div>
+      <div class="upcoming-meetings-list" id="upcoming-list"></div>
+    `;
+    mainContent.appendChild(upcomingSection);
+
+    const upcomingContainer = document.getElementById('upcoming-list');
+
+    // Function to render meetings
+    const renderUpcomingMeetings = (meetings) => {
+      upcomingContainer.innerHTML = '';
+      meetings.forEach(meeting => {
+        upcomingContainer.appendChild(createUpcomingMeetingCard(meeting));
+      });
+    };
+
+    // Initially show today's meetings (or first 3 of week if no meetings today)
+    renderUpcomingMeetings(todayMeetings.length > 0 ? todayMeetings : weekMeetings.slice(0, 3));
+
+    // Handle show more button
+    if (hasMoreMeetings) {
+      const showMoreBtn = document.getElementById('showMoreUpcoming');
+      showMoreBtn.addEventListener('click', () => {
+        showingAll = !showingAll;
+        if (showingAll) {
+          renderUpcomingMeetings(weekMeetings);
+          showMoreBtn.textContent = 'Show less';
+        } else {
+          renderUpcomingMeetings(todayMeetings.length > 0 ? todayMeetings : weekMeetings.slice(0, 3));
+          showMoreBtn.textContent = 'Show more';
+        }
+      });
+    }
+  }
+
+  // Group notes by date (excluding future meeting notes)
+  const notesByDate = {};
+  const allNotes = [...upcomingMeetings, ...pastMeetings]
+    .filter(meeting => meeting.type !== 'calendar' && !meeting.isFuture) // Exclude future meetings from notes
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  // Group meetings by date
+  allNotes.forEach(meeting => {
+    const dateKey = formatDateHeader(meeting.date);
+    if (!notesByDate[dateKey]) {
+      notesByDate[dateKey] = [];
+    }
+    notesByDate[dateKey].push(meeting);
   });
 
-  // Filter out calendar entries and add only document type meetings to the container
-  allMeetings
-    .filter(meeting => meeting.type !== 'calendar') // Skip calendar entries
-    .forEach(meeting => {
-      notesContainer.appendChild(createMeetingCard(meeting));
+  // Create notes sections grouped by date
+  Object.entries(notesByDate).forEach(([dateHeader, meetings]) => {
+    const dateSection = document.createElement('section');
+    dateSection.className = 'date-section';
+
+    // Add date header
+    const dateHeaderEl = document.createElement('h3');
+    dateHeaderEl.className = 'date-header';
+    dateHeaderEl.textContent = dateHeader;
+    dateSection.appendChild(dateHeaderEl);
+
+    // Add meetings for this date
+    const meetingsList = document.createElement('div');
+    meetingsList.className = 'date-meetings-list';
+
+    meetings.forEach(meeting => {
+      meetingsList.appendChild(createMeetingCardWithTime(meeting));
     });
+
+    dateSection.appendChild(meetingsList);
+    mainContent.appendChild(dateSection);
+  });
 }
 
 // Load meetings data from file
@@ -1072,13 +1676,12 @@ async function loadMeetingsDataFromFile() {
 
       console.log("Before updating arrays, pastMeetings count:", pastMeetings.length);
 
-      // Filter out calendar entries when loading data
+      // Copy all meetings to the arrays (including calendar-created notes)
+      // We want to keep calendar-created notes as they can have transcripts
       meetingsData.upcomingMeetings
-        .filter(meeting => meeting.type !== 'calendar')
         .forEach(meeting => upcomingMeetings.push(meeting));
 
       meetingsData.pastMeetings
-        .filter(meeting => meeting.type !== 'calendar')
         .forEach(meeting => pastMeetings.push(meeting));
 
       console.log("After updating arrays, pastMeetings count:", pastMeetings.length);
@@ -1426,6 +2029,94 @@ function initDebugPanel() {
           </svg>
         `;
       }
+    });
+  }
+
+  // Set up notification test buttons
+  const testSystemNotifBtn = document.getElementById('testSystemNotifBtn');
+  const testInAppNotifBtn = document.getElementById('testInAppNotifBtn');
+  const notifTestResult = document.getElementById('notifTestResult');
+
+  if (testSystemNotifBtn) {
+    testSystemNotifBtn.addEventListener('click', async () => {
+      notifTestResult.innerHTML = 'Testing system notification...<br>';
+
+      try {
+        const result = await window.electronAPI.testNotification();
+
+        if (result.details && Array.isArray(result.details)) {
+          // Display detailed results
+          notifTestResult.innerHTML += result.details.map(line => {
+            // Add some formatting for better readability
+            if (line.startsWith('✅')) {
+              return `<span style="color: green;">${line}</span>`;
+            } else if (line.startsWith('❌')) {
+              return `<span style="color: red;">${line}</span>`;
+            } else if (line.startsWith('⚠️')) {
+              return `<span style="color: orange;">${line}</span>`;
+            } else if (line.startsWith('📋')) {
+              return `<strong>${line}</strong>`;
+            }
+            return line;
+          }).join('<br>') + '<br>';
+        } else {
+          notifTestResult.innerHTML += `Result: ${JSON.stringify(result, null, 2)}<br>`;
+        }
+
+        // Scroll to bottom to show latest results
+        notifTestResult.scrollTop = notifTestResult.scrollHeight;
+      } catch (error) {
+        notifTestResult.innerHTML += `❌ Error: ${error.message}<br>`;
+      }
+    });
+  }
+
+  if (testInAppNotifBtn) {
+    testInAppNotifBtn.addEventListener('click', () => {
+      notifTestResult.innerHTML = 'Testing in-app notification...<br>';
+
+      // Create test notification
+      const notification = document.createElement('div');
+      notification.className = 'in-app-notification';
+      notification.innerHTML = `
+        <div class="notification-content">
+          <div class="notification-text">
+            <div class="notification-title">Test Notification</div>
+            <div class="notification-body">This is a test in-app notification.</div>
+          </div>
+          <button class="notification-action-btn" data-action="test-action">
+            Test Action
+          </button>
+        </div>
+        <button class="notification-close" data-action="close">×</button>
+      `;
+      document.body.appendChild(notification);
+
+      // Add event listeners for action buttons
+      const actionBtn = notification.querySelector('.notification-action-btn');
+      if (actionBtn) {
+        actionBtn.addEventListener('click', () => {
+          alert('Test Action clicked!');
+        });
+      }
+
+      // Add event listener for close button
+      const closeBtn = notification.querySelector('.notification-close');
+      if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+          notification.remove();
+        });
+      }
+
+      notifTestResult.innerHTML += '✅ In-app notification shown!<br>';
+
+      // Auto-remove after 5 seconds
+      setTimeout(() => {
+        if (notification.parentElement) {
+          notification.classList.add('fade-out');
+          setTimeout(() => notification.remove(), 300);
+        }
+      }, 5000);
     });
   }
 
@@ -1784,12 +2475,27 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Try to load the latest data from file - this is the only data source
   await loadMeetingsDataFromFile();
 
+  // Fetch calendar meetings
+  await fetchCalendarMeetings();
+
   // Render meetings only after loading from file
   console.log('Data loaded, rendering meetings...');
   renderMeetings();
 
   // Initially show home view
   showHomeView();
+
+  // Listen for calendar sync events
+  window.electronAPI.calendar.onCalendarSynced((meetings) => {
+    console.log('Calendar synced with', meetings.length, 'meetings');
+    calendarMeetings = meetings;
+    renderMeetings();
+  });
+
+  // Fetch calendar meetings initially and every 5 minutes
+  setInterval(() => {
+    fetchCalendarMeetings();
+  }, 5 * 60 * 1000);
 
   // Track if we've shown notification for current meeting
   let lastNotificationShown = false;
@@ -1801,38 +2507,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Store the meeting detection state globally
     window.meetingDetected = data.detected;
 
-    // Show in-app notification when meeting is detected
-    if (data.detected && !lastNotificationShown) {
-      lastNotificationShown = true;
+    // In-app notification removed - using custom notification window instead
+    // The custom notification window is created in the main process
 
-      // Get platform name if provided
-      const platform = data.platform || 'Meeting';
-
-      // Create notification element directly
-      const notification = document.createElement('div');
-      notification.className = 'in-app-notification';
-      notification.innerHTML = `
-        <div class="notification-content">
-          <div class="notification-text">
-            <div class="notification-title">Meeting detected</div>
-            <div class="notification-body">${platform} meeting found.</div>
-          </div>
-          <button class="notification-action-btn" onclick="window.handleNotificationAction('meeting-detected')">
-            Start Recording
-          </button>
-        </div>
-        <button class="notification-close" onclick="this.parentElement.remove()">×</button>
-      `;
-      document.body.appendChild(notification);
-
-      // Auto-remove after 10 seconds
-      setTimeout(() => {
-        if (notification.parentElement) {
-          notification.classList.add('fade-out');
-          setTimeout(() => notification.remove(), 300);
-        }
-      }, 10000);
-    } else if (!data.detected) {
+    if (!data.detected) {
       // Reset notification flag when meeting is no longer detected
       lastNotificationShown = false;
     }
@@ -1881,6 +2559,58 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 1500);
       }
     });
+  });
+
+  // Listen for calendar meeting notifications (from "Start Recording" button on calendar notifications)
+  window.electronAPI.onOpenCalendarMeeting(async (meetingData) => {
+    console.log('Received request to open calendar meeting from notification:', meetingData);
+
+    // Ensure we have the latest data
+    await loadMeetingsDataFromFile();
+
+    // Check if a note already exists for this meeting
+    let existingNote = [...pastMeetings, ...upcomingMeetings].find(m =>
+      m.id === meetingData.id || m.calendarEventId === meetingData.id
+    );
+
+    if (!existingNote) {
+      // Create a new note for this meeting
+      existingNote = {
+        id: `meeting_${Date.now()}`,
+        calendarEventId: meetingData.id,
+        title: meetingData.title || 'Untitled Meeting',
+        date: meetingData.startTime || meetingData.date,
+        startTime: meetingData.startTime,
+        endTime: meetingData.endTime,
+        type: 'calendar',
+        subtitle: meetingData.organizerEmail || '',
+        content: '',
+        attendees: meetingData.attendees || [],
+        location: meetingData.location,
+        videoMeetingUrl: meetingData.videoMeetingUrl,
+        isFuture: true // Mark as future meeting
+      };
+
+      // Add to upcomingMeetings (not pastMeetings for future meetings)
+      upcomingMeetings.push(existingNote);
+      meetingsData.upcomingMeetings.push(existingNote);
+
+      // Save to file
+      await window.electronAPI.saveMeetingsData(meetingsData);
+    }
+
+    // Open the note (either existing or newly created)
+    showEditorView(existingNote.id, true);
+
+    // Start recording immediately after a short delay to ensure editor is loaded
+    setTimeout(() => {
+      console.log('Starting recording for calendar meeting');
+      const recordButton = document.getElementById('recordButton');
+      if (recordButton && !window.isRecording) {
+        // Trigger the record button click to start recording
+        recordButton.click();
+      }
+    }, 500);
   });
 
   // Listen for recording completed events
@@ -2185,7 +2915,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Find the meeting card that was clicked (for opening)
-    const card = e.target.closest('.meeting-card');
+    // Support both old-style meeting cards and new meeting cards with time
+    const card = e.target.closest('.meeting-card, .meeting-card-with-time');
     if (card) {
       const meetingId = card.dataset.id;
       showEditorView(meetingId);
@@ -2331,6 +3062,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       console.log('Updating recording button for current note');
       const isActive = data.state === 'recording' || data.state === 'paused';
       updateRecordingButtonUI(isActive, isActive ? data.recordingId : null);
+
+      // Also update the future meeting indicator if it exists
+      const futureMeetingIndicator = document.getElementById('futureMeetingIndicator');
+      if (futureMeetingIndicator && futureMeetingIndicator.style.display !== 'none') {
+        // Re-display the meeting to update the UI
+        displayMeetingInEditor(currentEditingMeetingId);
+      }
     }
   });
 
@@ -2651,13 +3389,13 @@ document.addEventListener('DOMContentLoaded', async () => {
               document.body.appendChild(menu);
 
               // Handle logout click
-              document.getElementById('logoutBtn').onclick = async () => {
+              document.getElementById('logoutBtn').addEventListener('click', async () => {
                 if (confirm('Are you sure you want to sign out?')) {
                   menu.remove();
                   await window.electronAPI.auth.logout();
                   window.updateAuthStatus();
                 }
-              };
+              });
 
               // Close menu when clicking outside
               setTimeout(() => {
@@ -2735,16 +3473,33 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div class="notification-body">${data.body}</div>
         </div>
         ${data.action ? `
-          <button class="notification-action-btn" onclick="window.handleNotificationAction('${data.type}')">
+          <button class="notification-action-btn" data-action="${data.type}">
             ${data.action}
           </button>
         ` : ''}
       </div>
-      <button class="notification-close" onclick="this.parentElement.remove()">×</button>
+      <button class="notification-close" data-action="close">×</button>
     `;
 
     // Add to document
     document.body.appendChild(notification);
+
+    // Add event listeners for action buttons
+    const actionBtn = notification.querySelector('.notification-action-btn');
+    if (actionBtn) {
+      actionBtn.addEventListener('click', () => {
+        const action = actionBtn.getAttribute('data-action');
+        window.handleNotificationAction(action);
+      });
+    }
+
+    // Add event listener for close button
+    const closeBtn = notification.querySelector('.notification-close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        notification.remove();
+      });
+    }
 
     // Auto-remove after 10 seconds
     setTimeout(() => {
@@ -2771,6 +3526,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Show toast
         showToast('Recording started');
       }
+    } else if (type === 'test-action') {
+      alert('Test action clicked!');
     }
   };
 });

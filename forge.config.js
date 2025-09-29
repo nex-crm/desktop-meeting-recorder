@@ -6,17 +6,7 @@ module.exports = {
     asar: {
       unpackDir: "node_modules/@recallai"
     },
-    osxSign: {
-      continueOnError: false,
-      optionsForFile: (_) => {
-        // Here, we keep it simple and return a single entitlements.plist file.
-        // You can use this callback to map different sets of entitlements
-        // to specific files in your packaged app.
-        return {
-          entitlements: './Entitlements.plist'
-        };
-      }
-    },
+    osxSign: false, // Disabled - will need proper signing for notifications
     icon: './muesli',
     extendInfo: {
       NSUserNotificationAlertStyle: "alert",
