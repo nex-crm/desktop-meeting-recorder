@@ -11,10 +11,12 @@ require('dotenv').config();
 // Import Nex services
 const NexAuthService = require('./services/auth');
 const NexApiService = require('./services/api');
+const CalendarSyncService = require('./services/calendar');
 
 // Initialize services immediately
 const authService = new NexAuthService();
 let apiService;
+let calendarService;
 
 // Function to get the OpenRouter headers
 function getHeaderLines() {
@@ -48,8 +50,11 @@ if (require('electron-squirrel-startup')) {
 
 // Store detected meeting information
 let detectedMeeting = null;
+// Track meetings that have already been handled in this session
+let handledMeetingSessions = new Set();
 
 let mainWindow;
+let notificationWindow = null;
 
 const createWindow = () => {
   // Create the browser window.
@@ -60,6 +65,9 @@ const createWindow = () => {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
       contextIsolation: true,
       nodeIntegration: false,
+      // Enable notifications in renderer
+      webviewTag: false,
+      nativeWindowOpen: true
     },
     titleBarStyle: 'hiddenInset',
     backgroundColor: '#f9f9f9',
@@ -94,6 +102,238 @@ const createWindow = () => {
       mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
     }
   });
+
+  // Handle window closed - critical for preventing crashes
+  mainWindow.on('closed', () => {
+    // Dereference the window object to prevent accessing destroyed object
+    mainWindow = null;
+  });
+};
+
+// Function to create custom notification window
+const createNotificationWindow = (data = {}) => {
+  console.log('Creating custom notification window with data:', data);
+
+  // Close existing notification if any
+  if (notificationWindow && !notificationWindow.isDestroyed()) {
+    notificationWindow.close();
+  }
+
+  const { screen } = require('electron');
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width, height } = primaryDisplay.workAreaSize;
+
+  // Create notification window
+  notificationWindow = new BrowserWindow({
+    width: 360,
+    height: 80,
+    x: width - 380,
+    y: 30,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    resizable: false,
+    skipTaskbar: true,
+    hasShadow: true,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    }
+  });
+
+  // Set window level to ensure it stays on top even over fullscreen apps
+  notificationWindow.setAlwaysOnTop(true, 'screen-saver');
+  notificationWindow.setVisibleOnAllWorkspaces(true);
+
+  // Create the HTML content inline
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body {
+          margin: 0;
+          padding: 0;
+          background-color: transparent;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          overflow: hidden;
+          user-select: none;
+        }
+        .notification {
+          background: rgba(255, 255, 255, 0.98);
+          border-radius: 10px;
+          padding: 14px 16px;
+          margin: 8px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.1);
+          -webkit-app-region: drag;
+          animation: slideIn 0.25s ease-out;
+          position: relative;
+          backdrop-filter: blur(30px);
+        }
+        @keyframes slideIn {
+          from {
+            transform: translateX(400px);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        .close-btn {
+          position: absolute;
+          top: 8px;
+          right: 8px;
+          -webkit-app-region: no-drag;
+          cursor: pointer;
+          background: none;
+          border: none;
+          font-size: 16px;
+          color: rgba(0, 0, 0, 0.4);
+          width: 20px;
+          height: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 10px;
+          transition: all 0.2s;
+          padding: 0;
+        }
+        .close-btn:hover {
+          color: rgba(0, 0, 0, 0.6);
+          background: rgba(0, 0, 0, 0.08);
+        }
+        .notification-content {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        .notification-icon {
+          font-size: 20px;
+        }
+        .notification-text {
+          flex: 1;
+        }
+        .notification-header {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          margin-bottom: 2px;
+          max-width: 100%;
+        }
+        h3 {
+          margin: 0;
+          color: #1a1a1a;
+          font-size: 13px;
+          font-weight: 600;
+          letter-spacing: -0.2px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          flex: 1;
+          min-width: 0;
+        }
+        p {
+          margin: 0;
+          color: #666;
+          font-size: 12px;
+          line-height: 1.4;
+        }
+        .btn-primary {
+          background: #007AFF;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          padding: 6px 12px;
+          font-size: 12px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.15s;
+          letter-spacing: -0.1px;
+          -webkit-app-region: no-drag;
+        }
+        .btn-primary:hover {
+          background: #0051D5;
+          transform: scale(1.02);
+        }
+        .btn-primary:active {
+          transform: scale(0.98);
+        }
+        .platform-badge {
+          display: inline-flex;
+          align-items: center;
+          background: #f0f0f0;
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-size: 10px;
+          color: #666;
+          font-weight: 500;
+          letter-spacing: 0.3px;
+          text-transform: uppercase;
+          white-space: nowrap;
+          flex-shrink: 0;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="notification">
+        <button class="close-btn" id="closeBtn">✕</button>
+        <div class="notification-content">
+          <div class="notification-icon">🔴</div>
+          <div class="notification-text">
+            <div class="notification-header">
+              <span class="platform-badge" id="platformBadge">${data.platform || 'MEETING'}</span>
+              <h3 id="notificationTitle">${data.title || 'Meeting Detected'}</h3>
+            </div>
+            <p id="notificationBody">${data.body || 'Click to start recording'}</p>
+          </div>
+          <button class="btn-primary" id="actionBtn">${data.actionText || 'Start Recording'}</button>
+        </div>
+      </div>
+      <script>
+        const { ipcRenderer } = require('electron');
+        document.getElementById('closeBtn').addEventListener('click', () => {
+          ipcRenderer.send('close-notification');
+        });
+        document.getElementById('actionBtn').addEventListener('click', () => {
+          ipcRenderer.send('notification-action', 'start-recording');
+          ipcRenderer.send('close-notification');
+        });
+        setTimeout(() => {
+          ipcRenderer.send('close-notification');
+        }, 60000); // 60 seconds = 1 minute
+      </script>
+    </body>
+    </html>
+  `;
+
+  // Load HTML as data URL
+  const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+  console.log('Loading notification as data URL');
+  notificationWindow.loadURL(dataUrl);
+
+  // Send notification data once the window is ready
+  notificationWindow.webContents.on('did-finish-load', () => {
+    console.log('Notification window loaded, sending data');
+    notificationWindow.webContents.send('notification-data', data);
+  });
+
+  // Handle notification closed
+  notificationWindow.on('closed', () => {
+    console.log('Notification window closed');
+    notificationWindow = null;
+  });
+
+  // Add error event listener
+  notificationWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    console.error('Failed to load notification window:', errorCode, errorDescription);
+  });
+
+  // Make window click-through for dragging but keep buttons clickable
+  notificationWindow.setIgnoreMouseEvents(false);
+
+  return notificationWindow;
 };
 
 // This method will be called when Electron has finished
@@ -145,6 +385,12 @@ app.on('open-url', (event, url) => {
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(async () => {
   console.log("Registering IPC handlers...");
+
+  // Set app name for notifications on macOS
+  if (process.platform === 'darwin') {
+    app.setName('Nex Desktop Meeting Recorder');
+  }
+
   // Log all registered IPC handlers
   console.log("IPC handlers:", Object.keys(ipcMain._invokeHandlers));
 
@@ -175,12 +421,26 @@ app.whenReady().then(async () => {
   // Initialize API service
   apiService = new NexApiService(authService);
 
+  // Initialize calendar service with API service and storage
+  calendarService = new CalendarSyncService(apiService, authService.storage);
+
+  // Initialize calendar sync after successful auth
+  if (authService.isAuthenticated()) {
+    calendarService.initialize().catch(error => {
+      console.error('Failed to initialize calendar sync:', error);
+    });
+  }
+
   // Set up auth event listeners
   authService.on('auth:success', () => {
     console.log('Authentication successful');
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('auth:success');
     }
+    // Start calendar sync on successful auth
+    calendarService.initialize().catch(error => {
+      console.error('Failed to initialize calendar sync after auth:', error);
+    });
     // Initialize SDK after successful authentication
     initSDK();
   });
@@ -247,10 +507,33 @@ app.whenReady().then(async () => {
     return authService.isAuthenticated();
   });
 
+  // Notification window IPC handlers
+  ipcMain.on('close-notification', () => {
+    if (notificationWindow && !notificationWindow.isDestroyed()) {
+      notificationWindow.close();
+    }
+  });
+
+  ipcMain.on('notification-action', async (event, action) => {
+    if (action === 'start-recording') {
+      // Join the detected meeting when user clicks "Start Recording"
+      const result = await joinDetectedMeeting();
+
+      // Bring main window to front
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    }
+  });
+
   // Calendar IPC handlers
   ipcMain.handle('calendar:getUpcomingMeetings', async (event, hours) => {
     try {
-      const meetings = await apiService.getUpcomingMeetings(hours);
+      const result = await apiService.getUpcomingMeetings(hours);
+      // Extract meetings array from the result
+      const meetings = result.meetings || result;
       return { success: true, meetings };
     } catch (error) {
       console.error('Failed to fetch upcoming meetings:', error);
@@ -267,6 +550,54 @@ app.whenReady().then(async () => {
       return { success: false, error: error.message };
     }
   });
+
+  // Forward calendar sync events to renderer (if calendar service is initialized)
+  if (calendarService) {
+    calendarService.on('calendar:synced', (meetings) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('calendar:synced', meetings);
+      }
+    });
+
+    calendarService.on('meeting:starting', (meeting) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('meeting:starting', meeting);
+      }
+    });
+
+    calendarService.on('meeting:inProgress', (meeting) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('meeting:inProgress', meeting);
+      }
+    });
+
+    // Handle calendar meeting notifications (1 minute before meeting)
+    calendarService.on('meeting:notification', (notificationData) => {
+      console.log('Calendar meeting notification:', notificationData);
+
+      // Show custom notification window with meeting details
+      createNotificationWindow({
+        title: notificationData.title,
+        body: notificationData.body,
+        platform: 'CALENDAR',
+        actionText: notificationData.actionText,
+        meeting: notificationData.meeting
+      });
+    });
+
+    // Handle meeting join action from calendar notification
+    calendarService.on('meeting:join', (meeting) => {
+      console.log('Join meeting from calendar notification:', meeting);
+      // Bring main window to front and navigate to meeting
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.show();
+        mainWindow.focus();
+        // Send event to renderer to open the meeting
+        mainWindow.webContents.send('open-calendar-meeting', meeting);
+      }
+    });
+  }
 
   // Debug settings handler
   ipcMain.handle('settings:getDebugMode', async () => {
@@ -322,8 +653,18 @@ app.whenReady().then(async () => {
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
+  // Set mainWindow to null when all windows are closed
+  mainWindow = null;
   if (process.platform !== 'darwin') {
     app.quit();
+  }
+});
+
+// Clean up before quitting
+app.on('before-quit', () => {
+  // Clean up mainWindow reference
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow = null;
   }
 });
 
@@ -587,14 +928,44 @@ function initSDK() {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
 
-      // Send notification to renderer
-      mainWindow.webContents.send('show-in-app-notification', {
-        title: 'Meeting detected',
-        body: `${platformName} meeting found.`,
-        action: 'Start Recording',
-        type: 'meeting-detected'
-      });
+      // In-app notification removed - using custom window notification instead
     }
+  };
+
+  // Check if a detected meeting window is part of a calendar meeting
+  const checkIfMeetingIsOnCalendar = (meetingWindow) => {
+    if (!calendarService) return false;
+
+    // Get current time
+    const now = new Date();
+    const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
+    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+
+    // Get current or imminent meetings (starting within 5 minutes)
+    const currentMeeting = calendarService.getCurrentMeeting();
+    const upcomingMeetings = calendarService.getMeetingsInTimeRange(fiveMinutesAgo, fiveMinutesFromNow);
+
+    // Check if any calendar meeting matches the detected platform and is happening now or soon
+    const relevantMeetings = currentMeeting ? [currentMeeting, ...upcomingMeetings] : upcomingMeetings;
+
+    for (const meeting of relevantMeetings) {
+      // Check if meeting has a video URL that matches the platform
+      if (meeting.videoMeetingUrl) {
+        const url = meeting.videoMeetingUrl.toLowerCase();
+        const platform = meetingWindow.platform.toLowerCase();
+
+        // Check for platform matches
+        if ((platform === 'zoom' && url.includes('zoom')) ||
+            (platform === 'google-meet' && url.includes('meet.google')) ||
+            (platform === 'teams' && url.includes('teams.microsoft')) ||
+            (platform === 'webex' && url.includes('webex'))) {
+          console.log(`Detected meeting matches calendar meeting: ${meeting.title}`);
+          return true;
+        }
+      }
+    }
+
+    return false;
   };
 
   // Helper function to handle meeting detection
@@ -636,10 +1007,35 @@ function initSDK() {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('meeting-detected', evt);
     }
+
+    // Create a unique session key for this meeting (platform + window ID)
+    // This persists for the entire meeting lifecycle, not just the recording
+    const meetingSessionKey = `${evt.window.platform}-${evt.window.id}`;
+
+    // Check if this meeting is already on the calendar
+    const isCalendarMeeting = checkIfMeetingIsOnCalendar(evt.window);
+
+    // Only show notification if we haven't handled this meeting session yet AND it's not a calendar meeting
+    if (!handledMeetingSessions.has(meetingSessionKey) && !isCalendarMeeting) {
+      console.log(`First detection for ad-hoc meeting session ${meetingSessionKey}, showing notification`);
+      handledMeetingSessions.add(meetingSessionKey);
+      createNotificationWindow({
+        title: 'Meeting Detected',
+        body: `${platformName} meeting found. Click to start recording.`,
+        platform: platformName,
+        actionText: 'Start Recording'
+      });
+    } else if (isCalendarMeeting) {
+      console.log(`Meeting session ${meetingSessionKey} is a calendar meeting, skipping ad-hoc notification`);
+      // Still add to handled sessions to prevent future notifications
+      handledMeetingSessions.add(meetingSessionKey);
+    } else {
+      console.log(`Meeting session ${meetingSessionKey} already handled, skipping notification`);
+    }
   };
 
   // Listen for meeting detected events
-  RecallAiSdk.addEventListener('meeting-detected', (evt) => {
+  RecallAiSdk.addEventListener('meeting-detected', async (evt) => {
     handleMeetingDetected(evt);
 
     // Log the meeting detected event
@@ -661,24 +1057,29 @@ function initSDK() {
     // Get a user-friendly platform name, or use the raw platform name if not in our map
     const platformName = platformNames[evt.window.platform] || evt.window.platform;
 
-    // Try to send a system notification
-    try {
-      if (Notification.isSupported()) {
+    // Try to send a system notification using standard Electron API
+    if (Notification.isSupported()) {
+      try {
         console.log('Creating notification for platform:', platformName);
 
-        // Send a notification
-        let notification = new Notification({
-          title: 'Meeting detected',
+        // Keep a reference to prevent garbage collection
+        const notification = new Notification({
+          title: '🔴 Meeting Detected',
+          subtitle: platformName, // macOS-specific
           body: `${platformName} meeting found. Click to start recording.`,
-          silent: false, // Ensure notification makes a sound
-          urgency: 'normal' // Set urgency level
+          silent: false,
+          urgency: 'critical', // Linux, but doesn't hurt on macOS
+          timeoutType: 'never', // Keep notification visible
+          hasReply: false, // macOS-specific
+          closeButtonText: 'Dismiss' // macOS-specific
         });
 
-        // Handle notification click
+        // Store reference globally to prevent GC
+        global.lastNotification = notification;
+
         notification.on('click', () => {
           console.log("Notification clicked for platform:", platformName);
-          // Bring the app to focus
-          if (mainWindow) {
+          if (mainWindow && !mainWindow.isDestroyed()) {
             if (mainWindow.isMinimized()) mainWindow.restore();
             mainWindow.focus();
           }
@@ -686,26 +1087,28 @@ function initSDK() {
         });
 
         notification.on('show', () => {
-          console.log('Notification shown successfully');
+          console.log('Meeting notification shown successfully');
+
+          // Also bring the app to attention
+          if (app.dock) {
+            app.dock.bounce('critical'); // macOS dock bounce
+          }
         });
 
         notification.on('failed', (event, error) => {
-          console.error('Notification failed:', error);
-          // Fallback to in-app notification
-          sendInAppNotification(platformName);
+          console.error('Meeting notification failed:', error);
         });
 
         notification.show();
-        console.log('Notification.show() called');
-      } else {
-        console.log('Notifications are not supported, using in-app notification');
-        sendInAppNotification(platformName);
+      } catch (error) {
+        console.error('Error creating meeting notification:', error);
       }
-    } catch (error) {
-      console.error('Error creating notification:', error);
-      // Fallback to in-app notification
-      sendInAppNotification(platformName);
+    } else {
+      console.log('Notifications are not supported on this system');
     }
+
+    // Always send in-app notification as fallback
+    sendInAppNotification(platformName);
 
     // Send the meeting detected status to the renderer process
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -726,6 +1129,13 @@ function initSDK() {
     if (evt.window && evt.window.id && global.activeMeetingIds && global.activeMeetingIds[evt.window.id]) {
       console.log(`Cleaning up meeting tracking for: ${evt.window.id}`);
       delete global.activeMeetingIds[evt.window.id];
+    }
+
+    // Clear the session tracking so we can detect this meeting again if it reopens
+    if (evt.window && evt.window.id && evt.window.platform) {
+      const meetingSessionKey = `${evt.window.platform}-${evt.window.id}`;
+      handledMeetingSessions.delete(meetingSessionKey);
+      console.log(`Cleared session tracking for: ${meetingSessionKey}`);
     }
 
     detectedMeeting = null;
@@ -1226,18 +1636,49 @@ ipcMain.handle('stopManualRecording', async (event, recordingId) => {
 ipcMain.handle('testNotification', async () => {
   console.log('Testing notification...');
 
+  // Test custom notification window
+  createNotificationWindow({
+    title: '🔔 Test Notification',
+    body: 'This is a custom notification window test!',
+    platform: 'TEST',
+    actionText: 'Test Action'
+  });
+
+  // Comment out native notification for now - only use custom window
+  /*
   if (Notification.isSupported()) {
     const notification = new Notification({
-      title: 'Test Notification',
-      body: 'If you see this, notifications are working!'
+      title: '🔔 Test Notification',
+      subtitle: 'Nex Meeting Recorder', // macOS-specific
+      body: 'If you see this, notifications are working!',
+      silent: false,
+      urgency: 'critical',
+      timeoutType: 'never', // Keep visible until dismissed
+      closeButtonText: 'OK' // macOS-specific
     });
+
+    // Store reference to prevent garbage collection
+    global.testNotification = notification;
 
     notification.on('show', () => {
       console.log('Test notification shown successfully');
+
+      // Make the dock icon bounce on macOS
+      if (app.dock) {
+        app.dock.bounce('informational');
+      }
     });
 
     notification.on('failed', (event, error) => {
       console.error('Test notification failed:', error);
+    });
+
+    notification.on('click', () => {
+      console.log('Test notification clicked');
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.show();
+        mainWindow.focus();
+      }
     });
 
     notification.show();
@@ -1245,6 +1686,9 @@ ipcMain.handle('testNotification', async () => {
   } else {
     return { success: false, message: 'Notifications not supported' };
   }
+  */
+
+  return { success: true, message: 'Custom notification window shown' };
 });
 
 // Handle generating AI summary with streaming
@@ -2097,11 +2541,22 @@ async function joinDetectedMeeting() {
         console.log("Window is ready, creating new meeting note");
 
         try {
-          // Create a new meeting note and start recording
-          const id = await createMeetingNoteAndRecord(platformName);
+          // Check if we already have an active note for this meeting
+          const existingNote = global.activeMeetingIds &&
+                              global.activeMeetingIds[detectedMeeting.window.id] &&
+                              global.activeMeetingIds[detectedMeeting.window.id].noteId;
 
-          console.log("Created new meeting with ID:", id);
-          resolve({ success: true, meetingId: id });
+          if (existingNote) {
+            console.log("Note already exists for this meeting:", existingNote);
+            // Just bring the window to front, don't create a new note
+            resolve({ success: true, meetingId: existingNote, existing: true });
+          } else {
+            // Create a new meeting note and start recording
+            const id = await createMeetingNoteAndRecord(platformName);
+
+            console.log("Created new meeting with ID:", id);
+            resolve({ success: true, meetingId: id });
+          }
         } catch (err) {
           console.error("Error creating meeting note:", err);
           resolve({ success: false, error: err.message });

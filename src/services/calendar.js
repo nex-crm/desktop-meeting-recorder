@@ -112,36 +112,47 @@ class CalendarSyncService extends EventEmitter {
   }
 
   sendMeetingNotification(meeting, minutesUntil) {
-    const { Notification } = require('electron');
-
-    let body;
+    // Only show custom notification for 1 minute before meeting
     if (minutesUntil === 1) {
-      body = 'Meeting starts in 1 minute';
-    } else {
-      body = `Meeting starts in ${minutesUntil} minutes`;
+      // Emit event to show custom notification window
+      this.emit('meeting:notification', {
+        meeting,
+        minutesUntil,
+        title: meeting.title || 'Upcoming Meeting',
+        body: 'Meeting starts in 1 minute',
+        actionText: 'Start Recording'
+      });
     }
 
-    const notification = new Notification({
-      title: meeting.title || 'Upcoming Meeting',
-      body,
-      subtitle: meeting.organizerName || '',
-      sound: constants.NOTIFICATIONS.DEFAULT_NOTIFICATION_SOUND,
-      actions: [
-        { type: 'button', text: 'Join Meeting' }
-      ]
-    });
+    // For other reminder times, use regular notifications
+    else {
+      const { Notification } = require('electron');
 
-    notification.on('click', () => {
-      this.emit('meeting:join', meeting);
-    });
+      let body = `Meeting starts in ${minutesUntil} minutes`;
 
-    notification.on('action', (event, index) => {
-      if (index === 0) {
+      const notification = new Notification({
+        title: meeting.title || 'Upcoming Meeting',
+        body,
+        subtitle: meeting.organizerName || '',
+        sound: constants.NOTIFICATIONS.DEFAULT_NOTIFICATION_SOUND,
+        actions: [
+          { type: 'button', text: 'Join Meeting' }
+        ]
+      });
+
+      notification.on('click', () => {
         this.emit('meeting:join', meeting);
-      }
-    });
+      });
 
-    notification.show();
+      notification.on('action', (event, index) => {
+        if (index === 0) {
+          this.emit('meeting:join', meeting);
+        }
+      });
+
+      notification.show();
+    }
+
     this.emit('notification:sent', { meeting, minutesUntil });
   }
 
