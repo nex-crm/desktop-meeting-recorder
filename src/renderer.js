@@ -373,11 +373,13 @@ let currentEditingMeetingId = null;
 
 // Function to save the current note
 async function saveCurrentNote() {
-  const editorElement = document.getElementById('simple-editor');
+  // Support both legacy single editor and new dual-section editor
+  const legacyEditorElement = document.getElementById('simple-editor');
+  const personalNotesElement = document.getElementById('personal-notes-editor');
   const noteTitleElement = document.getElementById('noteTitle');
 
   // Early exit if elements aren't available
-  if (!editorElement || !noteTitleElement) {
+  if (!noteTitleElement || (!legacyEditorElement && !personalNotesElement)) {
     console.warn('Cannot save note: Editor elements not found');
     return;
   }
@@ -402,26 +404,41 @@ async function saveCurrentNote() {
   if (activeMeeting) {
     console.log(`Saving note with ID: ${currentEditingMeetingId}, Title: ${noteTitle}`);
 
-    // Get the current content from the editor
-    const content = editorElement.value;
-    console.log(`Note content length: ${content.length} characters`);
-
-    // Update the title and content in the meeting object
+    // Update the title
     activeMeeting.title = noteTitle;
-    activeMeeting.content = content;
+
+    // Get content based on which editor is present
+    if (personalNotesElement) {
+      // New tabbed editor
+      const personalNotes = personalNotesElement.value;
+      console.log(`Personal notes length: ${personalNotes.length} characters`);
+
+      // Save personal notes separately
+      activeMeeting.personalNotes = personalNotes;
+
+      // Get AI summary from editor
+      const aiSummaryEditor = document.getElementById('ai-summary-editor');
+      const aiSummary = aiSummaryEditor ? aiSummaryEditor.value : '';
+
+      activeMeeting.aiSummary = aiSummary;
+      activeMeeting.content = personalNotes; // Legacy field
+    } else if (legacyEditorElement) {
+      // Legacy single editor
+      const content = legacyEditorElement.value;
+      console.log(`Note content length: ${content.length} characters`);
+      activeMeeting.content = content;
+    }
 
     // Update the data arrays directly to make sure they stay in sync
     const pastIndex = meetingsData.pastMeetings.findIndex(m => m.id === currentEditingMeetingId);
     if (pastIndex !== -1) {
-      meetingsData.pastMeetings[pastIndex].title = noteTitle;
-      meetingsData.pastMeetings[pastIndex].content = content;
+      meetingsData.pastMeetings[pastIndex] = { ...activeMeeting };
       console.log('Updated meeting in pastMeetings array');
     }
 
     const upcomingIndex = meetingsData.upcomingMeetings.findIndex(m => m.id === currentEditingMeetingId);
     if (upcomingIndex !== -1) {
-      meetingsData.upcomingMeetings[upcomingIndex].title = noteTitle;
-      meetingsData.upcomingMeetings[upcomingIndex].content = content;
+      meetingsData.upcomingMeetings[upcomingIndex] = { ...activeMeeting };
       console.log('Updated meeting in upcomingMeetings array');
     }
 
@@ -1145,29 +1162,64 @@ function showEditorView(meetingId, isFutureMeeting = false) {
   const dateObj = new Date(meeting.date);
   document.getElementById('noteDate').textContent = formatDate(dateObj);
 
-  // Get the editor element
-  const editorElement = document.getElementById('simple-editor');
+  // Support both legacy and new tabbed editor
+  const legacyEditorElement = document.getElementById('simple-editor');
+  const personalNotesElement = document.getElementById('personal-notes-editor');
+  const aiSummaryEditor = document.getElementById('ai-summary-editor');
 
   // Important: Reset the editor content completely
-  if (editorElement) {
-    editorElement.value = '';
+  if (legacyEditorElement) {
+    legacyEditorElement.value = '';
+  }
+  if (personalNotesElement) {
+    personalNotesElement.value = '';
+  }
+  if (aiSummaryEditor) {
+    aiSummaryEditor.value = '';
   }
 
   // Add a small delay to ensure the DOM has updated before setting content
   setTimeout(() => {
-    if (meeting.content) {
-      editorElement.value = meeting.content;
-      console.log(`Loaded content for meeting: ${meetingId}, length: ${meeting.content.length} characters`);
-    } else {
-      // If content is missing, create template
-      const now = new Date();
-      const template = `# Meeting Title\n• ${meeting.title}\n\n# Meeting Date and Time\n• ${now.toLocaleString()}\n\n# Participants\n• \n\n# Description\n• \n\nChat with meeting transcript: `;
-      editorElement.value = template;
+    if (personalNotesElement) {
+      // New tabbed editor
+      // Load personal notes
+      if (meeting.personalNotes) {
+        personalNotesElement.value = meeting.personalNotes;
+        console.log(`Loaded personal notes for meeting: ${meetingId}, length: ${meeting.personalNotes.length} characters`);
+      } else if (meeting.content) {
+        // Migrate legacy content to personal notes
+        personalNotesElement.value = meeting.content;
+        meeting.personalNotes = meeting.content;
+        console.log(`Migrated legacy content to personal notes for meeting: ${meetingId}`);
+      }
 
-      // Save this template to the meeting
-      meeting.content = template;
-      saveMeetingsData();
-      console.log(`Created new template for meeting: ${meetingId}`);
+      // Load AI summary if it exists
+      if (meeting.aiSummary && aiSummaryEditor) {
+        aiSummaryEditor.value = meeting.aiSummary;
+        console.log(`Loaded AI summary for meeting: ${meetingId}, length: ${meeting.aiSummary.length} characters`);
+      }
+
+      // Update summary button state
+      updateSummaryButtonState(meeting.aiSummary && meeting.aiSummary.trim().length > 0);
+
+      // Load meeting video if available
+      loadMeetingVideo(meeting);
+    } else if (legacyEditorElement) {
+      // Legacy single editor
+      if (meeting.content) {
+        legacyEditorElement.value = meeting.content;
+        console.log(`Loaded content for meeting: ${meetingId}, length: ${meeting.content.length} characters`);
+      } else {
+        // If content is missing, create template
+        const now = new Date();
+        const template = `# Meeting Title\n• ${meeting.title}\n\n# Meeting Date and Time\n• ${now.toLocaleString()}\n\n# Participants\n• \n\n# Description\n• \n\nChat with meeting transcript: `;
+        legacyEditorElement.value = template;
+
+        // Save this template to the meeting
+        meeting.content = template;
+        saveMeetingsData();
+        console.log(`Created new template for meeting: ${meetingId}`);
+      }
     }
 
     // Set up auto-save handler for this specific note
@@ -1370,26 +1422,51 @@ function setupAutoSaveHandler() {
 
   // First remove any existing handler
   if (currentAutoSaveHandler) {
-    const editorElement = document.getElementById('simple-editor');
-    if (editorElement) {
-      console.log('Removing existing auto-save handler');
-      editorElement.removeEventListener('input', currentAutoSaveHandler);
+    const legacyEditor = document.getElementById('simple-editor');
+    const personalNotesEditor = document.getElementById('personal-notes-editor');
+    const aiSummaryEditor = document.getElementById('ai-summary-editor');
+
+    if (legacyEditor) {
+      console.log('Removing existing auto-save handler from legacy editor');
+      legacyEditor.removeEventListener('input', currentAutoSaveHandler);
+    }
+    if (personalNotesEditor) {
+      console.log('Removing existing auto-save handler from personal notes editor');
+      personalNotesEditor.removeEventListener('input', currentAutoSaveHandler);
+    }
+    if (aiSummaryEditor) {
+      console.log('Removing existing auto-save handler from AI summary editor');
+      aiSummaryEditor.removeEventListener('input', currentAutoSaveHandler);
     }
   }
 
   // Store the reference for future cleanup
   currentAutoSaveHandler = autoSaveHandler;
 
-  // Get the editor element and attach the new handler
-  const editorElement = document.getElementById('simple-editor');
-  if (editorElement) {
-    editorElement.addEventListener('input', autoSaveHandler);
-    console.log(`Set up editor auto-save handler for meeting: ${currentEditingMeetingId || 'none'}`);
+  // Attach handler to whichever editors are present
+  const legacyEditor = document.getElementById('simple-editor');
+  const personalNotesEditor = document.getElementById('personal-notes-editor');
+  const aiSummaryEditor = document.getElementById('ai-summary-editor');
+
+  if (personalNotesEditor && aiSummaryEditor) {
+    // New tabbed editor - attach to both editors
+    personalNotesEditor.addEventListener('input', autoSaveHandler);
+    aiSummaryEditor.addEventListener('input', autoSaveHandler);
+    console.log(`Set up tabbed editor auto-save handlers for meeting: ${currentEditingMeetingId || 'none'}`);
 
     // Manually trigger a save once to ensure the content is saved
     setTimeout(() => {
       console.log('Triggering initial save after setup');
-      editorElement.dispatchEvent(new Event('input'));
+      personalNotesEditor.dispatchEvent(new Event('input'));
+    }, 500);
+  } else if (legacyEditor) {
+    legacyEditor.addEventListener('input', autoSaveHandler);
+    console.log(`Set up legacy editor auto-save handler for meeting: ${currentEditingMeetingId || 'none'}`);
+
+    // Manually trigger a save once to ensure the content is saved
+    setTimeout(() => {
+      console.log('Triggering initial save after setup');
+      legacyEditor.dispatchEvent(new Event('input'));
     }, 500);
   } else {
     console.warn('Editor element not found for auto-save setup');
@@ -1458,9 +1535,14 @@ async function createNewMeeting() {
   console.log('Set currentEditingMeetingId to:', id);
 
   // Force a reset of the editor before showing the new meeting
-  const editorElement = document.getElementById('simple-editor');
-  if (editorElement) {
-    editorElement.value = '';
+  const personalNotesEditor = document.getElementById('personal-notes-editor');
+  if (personalNotesEditor) {
+    personalNotesEditor.value = '';
+  }
+
+  const aiSummaryEditor = document.getElementById('ai-summary-editor');
+  if (aiSummaryEditor) {
+    aiSummaryEditor.value = '';
   }
 
   // Now show the editor view with the new meeting
@@ -2344,6 +2426,177 @@ const sdkLogger = {
 let transcriptService;
 window.transcriptService = null; // Make it accessible for debugging
 
+// Initialize video section functionality
+function initVideoSection() {
+  const videoSectionToggle = document.getElementById('videoSectionToggle');
+  const videoSection = document.getElementById('videoSection');
+
+  if (videoSectionToggle && videoSection) {
+    videoSectionToggle.addEventListener('click', () => {
+      videoSection.classList.toggle('collapsed');
+    });
+  }
+}
+
+// Load video for meeting
+function loadMeetingVideo(meeting) {
+  console.log('loadMeetingVideo called for meeting:', meeting.id, 'videoPath:', meeting.videoPath);
+  const videoSection = document.getElementById('videoSection');
+  const videoSource = document.getElementById('videoSource');
+  const meetingVideo = document.getElementById('meetingVideo');
+  const videoDuration = document.getElementById('videoDuration');
+
+  if (!videoSection || !videoSource || !meetingVideo) {
+    console.log('Video section elements not found');
+    return;
+  }
+
+  // Check if meeting has a recording (videoPath)
+  if (meeting.videoPath) {
+    // Show video section
+    videoSection.style.display = 'block';
+
+    console.log('Loading video from:', meeting.videoPath);
+
+    // Load video through IPC to get base64 data URL
+    window.electronAPI.getVideoFile(meeting.videoPath).then(result => {
+      if (result.success && result.dataUrl) {
+        videoSource.src = result.dataUrl;
+        meetingVideo.load();
+
+        // Update duration when metadata loads
+        meetingVideo.addEventListener('loadedmetadata', () => {
+          const duration = meetingVideo.duration;
+          const minutes = Math.floor(duration / 60);
+          const seconds = Math.floor(duration % 60);
+          videoDuration.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }, { once: true });
+      } else {
+        console.error('Failed to load video:', result.error);
+        videoSection.style.display = 'none';
+      }
+    }).catch(error => {
+      console.error('Error loading video file:', error);
+      videoSection.style.display = 'none';
+    });
+
+    // Handle video errors
+    meetingVideo.addEventListener('error', (e) => {
+      console.error('Video loading error:', e, meetingVideo.error);
+      videoSection.style.display = 'none';
+    }, { once: true });
+  } else {
+    // Hide video section if no recording
+    videoSection.style.display = 'none';
+  }
+}
+
+// Initialize tabbed editor functionality
+function initTabbedEditor() {
+  const tabButtons = document.querySelectorAll('.tab-btn');
+  const tabContents = document.querySelectorAll('.editor-tab-content');
+
+  if (!tabButtons.length || !tabContents.length) {
+    console.log('Tabbed editor elements not found');
+    return;
+  }
+
+  tabButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      const targetTab = button.getAttribute('data-tab');
+
+      // Remove active class from all buttons and contents
+      tabButtons.forEach(btn => btn.classList.remove('active'));
+      tabContents.forEach(content => content.classList.remove('active'));
+
+      // Add active class to clicked button and corresponding content
+      button.classList.add('active');
+      const targetContent = document.getElementById(`${targetTab}-tab`);
+      if (targetContent) {
+        targetContent.classList.add('active');
+      }
+
+      console.log(`Switched to ${targetTab} tab`);
+    });
+  });
+
+  // Initialize summary button behavior
+  initSummaryButton();
+
+  // Initialize video section
+  initVideoSection();
+}
+
+// Track if summary button is already initialized
+let summaryButtonInitialized = false;
+
+// Initialize context-aware summary button
+function initSummaryButton() {
+  // Only initialize once
+  if (summaryButtonInitialized) return;
+
+  const generateBtn = document.getElementById('generateBtn');
+
+  if (!generateBtn) return;
+
+  // Handle generate button click
+  generateBtn.addEventListener('click', async (e) => {
+    const state = generateBtn.getAttribute('data-state');
+
+    if (state === 'has-summary') {
+      // If summary exists, just switch to summary tab (same as clicking summary tab button)
+      const summaryTabBtn = document.querySelector('.tab-btn[data-tab="ai-summary"]');
+      if (summaryTabBtn) summaryTabBtn.click();
+    } else {
+      // Generate summary
+      if (currentEditingMeetingId) {
+        try {
+          console.log('Starting summary generation for meeting:', currentEditingMeetingId);
+
+          // Update button state to show loading
+          generateBtn.disabled = true;
+          const btnText = generateBtn.querySelector('.btn-text');
+          if (btnText) btnText.textContent = 'Generating...';
+
+          // Check if the API method exists
+          if (!window.electronAPI || !window.electronAPI.generateMeetingSummaryStreaming) {
+            throw new Error('Summary generation API not available');
+          }
+
+          const result = await window.electronAPI.generateMeetingSummaryStreaming(currentEditingMeetingId);
+          console.log('Summary generation result:', result);
+
+          if (result && !result.success) {
+            throw new Error(result.error || 'Failed to generate summary');
+          }
+        } catch (error) {
+          console.error('Error generating summary:', error);
+          alert('Error generating summary: ' + (error.message || error));
+        } finally {
+          // Reset button state
+          generateBtn.disabled = false;
+          const btnText = generateBtn.querySelector('.btn-text');
+          if (btnText) btnText.textContent = 'Summarize';
+        }
+      }
+    }
+  });
+
+  summaryButtonInitialized = true;
+}
+
+// Update summary button state based on whether summary exists
+function updateSummaryButtonState(hasSummary) {
+  const generateBtn = document.getElementById('generateBtn');
+  if (!generateBtn) return;
+
+  if (hasSummary) {
+    generateBtn.setAttribute('data-state', 'has-summary');
+  } else {
+    generateBtn.setAttribute('data-state', 'initial');
+  }
+}
+
 // Initialize sidebar functionality
 function initMeetingSidebar() {
   const sidebar = document.getElementById('meetingSidebar');
@@ -2379,9 +2632,23 @@ function initMeetingSidebar() {
   // Copy text functionality
   if (copyTextBtn) {
     copyTextBtn.addEventListener('click', async () => {
-      const editorElement = document.getElementById('simple-editor');
-      if (editorElement) {
-        const notesContent = editorElement.value;
+      // Get content from tabbed editor
+      const personalNotesEditor = document.getElementById('personal-notes-editor');
+      const aiSummaryEditor = document.getElementById('ai-summary-editor');
+
+      let notesContent = '';
+
+      // Combine personal notes and AI summary
+      if (personalNotesEditor && personalNotesEditor.value) {
+        notesContent += personalNotesEditor.value;
+      }
+
+      if (aiSummaryEditor && aiSummaryEditor.value) {
+        if (notesContent) notesContent += '\n\n---\n\n';
+        notesContent += 'AI SUMMARY:\n\n' + aiSummaryEditor.value;
+      }
+
+      if (notesContent) {
         transcriptService.setNotes(notesContent);
 
         const success = await transcriptService.copyNotesToClipboard();
@@ -2465,6 +2732,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Initialize sidebar
   initMeetingSidebar();
+
+  // Initialize the tabbed editor
+  initTabbedEditor();
 
   // Initialize the SDK Logger
   sdkLogger.init();
@@ -2622,7 +2892,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Refresh the editor with the updated content
         const meeting = [...upcomingMeetings, ...pastMeetings].find(m => m.id === meetingId);
         if (meeting) {
-          document.getElementById('simple-editor').value = meeting.content;
+          // Update personal notes if available
+          const personalNotesEditor = document.getElementById('personal-notes-editor');
+          if (personalNotesEditor && meeting.personalNotes) {
+            personalNotesEditor.value = meeting.personalNotes;
+          }
+
+          // Update AI summary if available
+          const aiSummaryEditor = document.getElementById('ai-summary-editor');
+          if (aiSummaryEditor && meeting.aiSummary) {
+            aiSummaryEditor.value = meeting.aiSummary;
+          }
         }
       });
     }
@@ -2753,8 +3033,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       loadMeetingsDataFromFile().then(() => {
         const meeting = [...upcomingMeetings, ...pastMeetings].find(m => m.id === meetingId);
         if (meeting) {
-          // Update the editor with the new content containing the summary
-          document.getElementById('simple-editor').value = meeting.content;
+          // Update the AI summary in the tabbed editor
+          const aiSummaryEditor = document.getElementById('ai-summary-editor');
+          if (aiSummaryEditor && meeting.aiSummary) {
+            aiSummaryEditor.value = meeting.aiSummary;
+
+            // Update summary button state
+            updateSummaryButtonState(true);
+
+            // Switch to summary tab to show the result
+            const summaryTab = document.querySelector('.tab-btn[data-tab="ai-summary"]');
+            if (summaryTab) {
+              summaryTab.click();
+            }
+          }
         }
       });
     }
@@ -2762,21 +3054,30 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Listen for streaming summary updates
   window.electronAPI.onSummaryUpdate((data) => {
-    const { meetingId, content } = data;
+    const { meetingId, content, aiSummary } = data;
 
     // If this note is currently being edited, update the content immediately
     if (currentEditingMeetingId === meetingId) {
-      // Get the editor element
-      const editorElement = document.getElementById('simple-editor');
+      // Support both legacy and new dual-section editor
+      const legacyEditor = document.getElementById('simple-editor');
+      const aiSummaryEditor = document.getElementById('ai-summary-editor');
 
       // Update the editor with the latest streamed content
       // Use requestAnimationFrame for smoother updates that don't block the main thread
       requestAnimationFrame(() => {
-        editorElement.value = content;
+        if (aiSummary && aiSummaryEditor) {
+          // New dual-section editor - update AI summary section
+          aiSummaryEditor.value = aiSummary;
 
-        // Force the editor to scroll to the bottom to follow the new text
-        // This creates a better experience of watching text appear
-        editorElement.scrollTop = editorElement.scrollHeight;
+          // Scroll to bottom of AI summary to follow the streaming text
+          aiSummaryEditor.scrollTop = aiSummaryEditor.scrollHeight;
+        } else if (content && legacyEditor) {
+          // Legacy editor - update the whole content
+          legacyEditor.value = content;
+
+          // Force the editor to scroll to the bottom to follow the new text
+          legacyEditor.scrollTop = legacyEditor.scrollHeight;
+        }
       });
     }
   });
@@ -3276,8 +3577,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       loadMeetingsDataFromFile().then(() => {
         // Refresh the editor with the updated content
         const meeting = [...upcomingMeetings, ...pastMeetings].find(m => m.id === meetingId);
-        if (meeting) {
-          document.getElementById('simple-editor').value = meeting.content;
+        const simpleEditor = document.getElementById('simple-editor');
+        if (meeting && simpleEditor) {
+          simpleEditor.value = meeting.content;
         }
       });
     }

@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveMeetingsData: (data) => ipcRenderer.invoke('saveMeetingsData', data),
   loadMeetingsData: () => ipcRenderer.invoke('loadMeetingsData'),
   deleteMeeting: (meetingId) => ipcRenderer.invoke('deleteMeeting', meetingId),
+  getVideoFile: (videoPath) => ipcRenderer.invoke('getVideoFile', videoPath),
   generateMeetingSummary: (meetingId) => ipcRenderer.invoke('generateMeetingSummary', meetingId),
   generateMeetingSummaryStreaming: (meetingId) => ipcRenderer.invoke('generateMeetingSummaryStreaming', meetingId),
   startManualRecording: (meetingId) => ipcRenderer.invoke('startManualRecording', meetingId),

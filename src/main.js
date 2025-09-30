@@ -1504,6 +1504,27 @@ ipcMain.handle('saveMeetingsData', async (event, data) => {
   }
 });
 
+// Handler to get video file as base64 data URL for playback
+ipcMain.handle('getVideoFile', async (event, videoPath) => {
+  try {
+    if (!videoPath || !fs.existsSync(videoPath)) {
+      return { success: false, error: 'Video file not found' };
+    }
+
+    // Read the video file as a buffer
+    const videoBuffer = fs.readFileSync(videoPath);
+
+    // Convert to base64 data URL
+    const base64Video = videoBuffer.toString('base64');
+    const dataUrl = `data:video/mp4;base64,${base64Video}`;
+
+    return { success: true, dataUrl };
+  } catch (error) {
+    console.error('Failed to load video file:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // Debug handler to check if IPC handlers are registered
 ipcMain.handle('debugGetHandlers', async () => {
   console.log("Checking registered IPC handlers...");
@@ -1657,8 +1678,13 @@ ipcMain.handle('generateMeetingSummary', async (event, meetingId) => {
       console.error('Error checking for video files:', err);
     }
 
-    // Create content with the AI-generated summary
-    meeting.content = `# ${meetingTitle}\n\n${summary}`;
+    // Save AI summary to dedicated field
+    meeting.aiSummary = summary;
+
+    // For backward compatibility, keep content field with personal notes
+    if (meeting.personalNotes) {
+      meeting.content = meeting.personalNotes;
+    }
 
     // If video exists, store the path separately but don't add it to the content
     if (videoExists) {
@@ -1912,19 +1938,19 @@ ipcMain.handle('generateMeetingSummaryStreaming', async (event, meetingId) => {
     // Get meeting title for use in the new content
     const meetingTitle = meeting.title || "Meeting Notes";
 
-    // Initial content with placeholders
-    meeting.content = `# ${meetingTitle}\n\nGenerating summary...`;
+    // Initial placeholder for AI summary
+    meeting.aiSummary = "Generating summary...";
 
     // Update the note on the frontend right away
     mainWindow.webContents.send('summary-update', {
       meetingId,
-      content: meeting.content
+      aiSummary: meeting.aiSummary
     });
 
     // Create progress callback for streaming updates
     const streamProgress = (currentText) => {
-      // Update content with current streaming text
-      meeting.content = `# ${meetingTitle}\n\n## AI-Generated Meeting Summary\n${currentText}`;
+      // Update aiSummary with current streaming text
+      meeting.aiSummary = currentText;
 
       // Send immediate update to renderer - don't debounce or delay this
       if (mainWindow && !mainWindow.isDestroyed()) {
@@ -1932,7 +1958,7 @@ ipcMain.handle('generateMeetingSummaryStreaming', async (event, meetingId) => {
           // Force immediate send of the update
           mainWindow.webContents.send('summary-update', {
             meetingId,
-            content: meeting.content,
+            aiSummary: meeting.aiSummary,
             timestamp: Date.now() // Add timestamp to ensure uniqueness
           });
         } catch (err) {
@@ -1944,9 +1970,14 @@ ipcMain.handle('generateMeetingSummaryStreaming', async (event, meetingId) => {
     // Generate summary with streaming
     const summary = await generateMeetingSummary(meeting, streamProgress);
 
-    // Make sure the final content is set correctly
-    meeting.content = `# ${meetingTitle}\n\n${summary}`;
+    // Make sure the final AI summary is set correctly
+    meeting.aiSummary = summary;
     meeting.hasSummary = true;
+
+    // For backward compatibility, also update the content field (combine personal notes + AI summary)
+    if (meeting.personalNotes) {
+      meeting.content = meeting.personalNotes; // Keep personal notes in legacy content field
+    }
 
     // Save the updated data with summary
     await fileOperationManager.writeData(meetingsData);
@@ -2428,9 +2459,16 @@ async function generateMeetingSummary(meeting, progressCallback = null) {
       ).join('\n');
     }
 
+    // Include personal notes if available
+    let personalNotesText = "";
+    if (meeting.personalNotes && meeting.personalNotes.trim().length > 0) {
+      personalNotesText = "Personal notes from the user:\n" + meeting.personalNotes;
+    }
+
     // Define a system prompt to guide the AI's response with a specific format
     const systemMessage =
       "You are an AI assistant that summarizes meeting transcripts. " +
+      "The user may have added personal notes during the meeting - pay special attention to these as they represent key takeaways and important points the user cared about. " +
       "You MUST format your response using the following structure:\n\n" +
       "# Participants\n" +
       "- [List all participants mentioned in the transcript]\n\n" +
@@ -2438,18 +2476,20 @@ async function generateMeetingSummary(meeting, progressCallback = null) {
       "- [Key discussion point 1]\n" +
       "- [Key discussion point 2]\n" +
       "- [Key decisions made]\n" +
-      "- [Include any important deadlines or dates mentioned]\n\n" +
+      "- [Include any important deadlines or dates mentioned]\n" +
+      "- [Incorporate insights from the user's personal notes]\n\n" +
       "# Action Items\n" +
       "- [Action item 1] - [Responsible person if mentioned]\n" +
       "- [Action item 2] - [Responsible person if mentioned]\n" +
-      "- [Add any other action items discussed]\n\n" +
-      "Stick strictly to this format with these exact section headers. Keep each bullet point concise but informative.";
+      "- [Add any other action items discussed or noted by the user]\n\n" +
+      "Stick strictly to this format with these exact section headers. Keep each bullet point concise but informative. " +
+      "If the user's personal notes mention specific action items or key points, ensure they are included in the appropriate sections.";
 
     // Prepare the messages array for the API
     const messages = [
       { role: "system", content: systemMessage },
       { role: "user", content: `Summarize the following meeting transcript with the EXACT format specified in your instructions:
-${participantsText ? participantsText + "\n\n" : ""}
+${participantsText ? participantsText + "\n\n" : ""}${personalNotesText ? personalNotesText + "\n\n" : ""}
 Transcript:
 ${transcriptText}` }
     ];
@@ -2604,28 +2644,28 @@ async function updateNoteWithRecordingInfo(recordingId) {
       // Get meeting title for use in the new content
       const meetingTitle = meeting.title || "Meeting Notes";
 
-      // Create initial content with placeholder
-      meeting.content = `# ${meetingTitle}\nGenerating summary...`;
+      // Create initial placeholder for AI summary
+      meeting.aiSummary = "Generating summary...";
 
       // Notify any open editors immediately
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('summary-update', {
           meetingId: meeting.id,
-          content: meeting.content
+          aiSummary: meeting.aiSummary
         });
       }
 
       // Create progress callback for streaming updates
       const streamProgress = (currentText) => {
-        // Update content with current streaming text
-        meeting.content = `# ${meetingTitle}\n\n${currentText}`;
+        // Update aiSummary with current streaming text
+        meeting.aiSummary = currentText;
 
         // Send immediate update to renderer if note is open
         if (mainWindow && !mainWindow.isDestroyed()) {
           try {
             mainWindow.webContents.send('summary-update', {
               meetingId: meeting.id,
-              content: meeting.content,
+              aiSummary: meeting.aiSummary,
               timestamp: Date.now() // Add timestamp to ensure uniqueness
             });
           } catch (err) {
@@ -2664,8 +2704,13 @@ async function updateNoteWithRecordingInfo(recordingId) {
 
       console.log("Attempting to embed video file", videoFilePath);
 
-      // Set the content to just the summary
-      meeting.content = `${summary}`;
+      // Save AI summary to dedicated field
+      meeting.aiSummary = summary;
+
+      // For backward compatibility, keep content field with personal notes
+      if (meeting.personalNotes) {
+        meeting.content = meeting.personalNotes;
+      }
 
       // If video exists, store the path separately but don't add it to the content
       if (videoExists) {
