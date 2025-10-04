@@ -1913,7 +1913,8 @@ async function fetchCalendarMeetings() {
 
     if (result.success && result.meetings && Array.isArray(result.meetings)) {
       console.log('Fetched', result.meetings.length, 'upcoming meetings from API');
-      console.log('Meetings data:', result.meetings);
+      console.log('First meeting details:', result.meetings[0]);
+      console.log('Meeting startTime:', result.meetings[0]?.startTime, 'endTime:', result.meetings[0]?.endTime);
       calendarMeetings = result.meetings;
 
       // Sort meetings by start time
