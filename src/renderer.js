@@ -2035,12 +2035,12 @@ function renderMeetings() {
 
         const newMeetingsCount = calendarMeetings.length - previousMeetingsCount;
         const message = newMeetingsCount > 0
-          ? `${newMeetingsCount} new`
+          ? `${newMeetingsCount} new meeting${newMeetingsCount > 1 ? 's' : ''} added`
           : newMeetingsCount < 0
-          ? `${Math.abs(newMeetingsCount)} removed`
-          : 'Up to date';
+          ? `${Math.abs(newMeetingsCount)} meeting${Math.abs(newMeetingsCount) > 1 ? 's' : ''} removed`
+          : 'Meetings are up to date';
 
-        refreshBtn.innerHTML = `<span style="font-size: 12px;">${message}</span>`;
+        refreshBtn.innerHTML = `<span style="font-size: 11px;">${message}</span>`;
         refreshBtn.disabled = false;
         refreshBtn.style.opacity = '1';
 
