@@ -2018,12 +2018,35 @@ function renderMeetings() {
     const refreshBtn = document.getElementById('refreshMeetings');
     if (refreshBtn) {
       refreshBtn.addEventListener('click', async () => {
+        const originalHTML = refreshBtn.innerHTML;
+        const previousMeetingsCount = calendarMeetings.length;
+
         refreshBtn.disabled = true;
         refreshBtn.style.opacity = '0.5';
+        refreshBtn.innerHTML = `
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite;">
+            <style>@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }</style>
+            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+          </svg>
+        `;
+
         await fetchCalendarMeetings();
         renderMeetings();
+
+        const newMeetingsCount = calendarMeetings.length - previousMeetingsCount;
+        const message = newMeetingsCount > 0
+          ? `${newMeetingsCount} new`
+          : newMeetingsCount < 0
+          ? `${Math.abs(newMeetingsCount)} removed`
+          : 'Up to date';
+
+        refreshBtn.innerHTML = `<span style="font-size: 12px;">${message}</span>`;
         refreshBtn.disabled = false;
         refreshBtn.style.opacity = '1';
+
+        setTimeout(() => {
+          refreshBtn.innerHTML = originalHTML;
+        }, 2000);
       });
     }
   }
