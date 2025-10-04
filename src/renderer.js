@@ -1962,6 +1962,8 @@ function renderMeetings() {
     const todayMeetings = sortedMeetings.filter(meeting => {
       const meetingStart = new Date(meeting.startTime);
       const meetingEnd = new Date(meeting.endTime);
+      console.log('Filtering meeting:', meeting.title, 'Start:', meetingStart, 'End:', meetingEnd, 'Now:', now);
+      console.log('meetingEnd >= now:', meetingEnd >= now, 'meetingStart <= endOfToday:', meetingStart <= endOfToday);
       // Show if meeting hasn't ended yet (includes ongoing meetings)
       return meetingEnd >= now && meetingStart <= endOfToday;
     });
@@ -1969,9 +1971,13 @@ function renderMeetings() {
     const weekMeetings = sortedMeetings.filter(meeting => {
       const meetingStart = new Date(meeting.startTime);
       const meetingEnd = new Date(meeting.endTime);
+      console.log('Week filter - meeting:', meeting.title, 'meetingEnd >= now:', meetingEnd >= now, 'meetingStart <= endOfWeek:', meetingStart <= endOfWeek);
       // Show if meeting hasn't ended yet (includes ongoing meetings)
       return meetingEnd >= now && meetingStart <= endOfWeek;
     });
+
+    console.log('Today meetings count:', todayMeetings.length);
+    console.log('Week meetings count:', weekMeetings.length);
 
     let showingAll = false;
     const hasMoreMeetings = weekMeetings.length > 4;
