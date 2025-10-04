@@ -1954,13 +1954,17 @@ function renderMeetings() {
     endOfWeek.setHours(23, 59, 59, 999);
 
     const todayMeetings = sortedMeetings.filter(meeting => {
-      const meetingDate = new Date(meeting.startTime);
-      return meetingDate >= now && meetingDate <= endOfToday;
+      const meetingStart = new Date(meeting.startTime);
+      const meetingEnd = new Date(meeting.endTime);
+      // Show if meeting hasn't ended yet (includes ongoing meetings)
+      return meetingEnd >= now && meetingStart <= endOfToday;
     });
 
     const weekMeetings = sortedMeetings.filter(meeting => {
-      const meetingDate = new Date(meeting.startTime);
-      return meetingDate >= now && meetingDate <= endOfWeek;
+      const meetingStart = new Date(meeting.startTime);
+      const meetingEnd = new Date(meeting.endTime);
+      // Show if meeting hasn't ended yet (includes ongoing meetings)
+      return meetingEnd >= now && meetingStart <= endOfWeek;
     });
 
     let showingAll = false;
