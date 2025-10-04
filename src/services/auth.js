@@ -132,6 +132,7 @@ class NexAuthService extends EventEmitter {
       };
 
       await this.fetchUserProfile();
+      await this.fetchAndStoreWorkspace();
       this.setupTokenRefresh();
       this.emit('auth:success');
       return result;
@@ -221,10 +222,6 @@ class NexAuthService extends EventEmitter {
 
       this.storage.setUser(user);
 
-      // Workspace info would need to be fetched with workspace slug, not ID
-      // This would require getting the workspace slug from the user response
-      // For now, we'll skip workspace fetching until we know how to get the slug
-
       return user;
     } catch (error) {
       console.error('Failed to fetch user profile:', error);
@@ -236,6 +233,50 @@ class NexAuthService extends EventEmitter {
       }
 
       throw error;
+    }
+  }
+
+  async fetchAndStoreWorkspace() {
+    try {
+      console.log('Fetching workspaces...');
+      const response = await this.apiClient.get('/v1/workspaces');
+
+      // Extract from response - handle both direct workspaces array and memberships structure
+      const responseData = response.data?.data || response.data;
+      console.log('Workspaces response:', responseData);
+
+      let workspaces = [];
+
+      // Check if response has memberships array (workspace membership structure)
+      if (responseData?.memberships && Array.isArray(responseData.memberships)) {
+        // Extract workspace from each membership
+        workspaces = responseData.memberships.map(m => m.workspace).filter(w => w);
+      }
+      // Or direct workspaces array
+      else if (responseData?.workspaces && Array.isArray(responseData.workspaces)) {
+        workspaces = responseData.workspaces;
+      }
+      // Or response data itself is the workspaces array
+      else if (Array.isArray(responseData)) {
+        workspaces = responseData;
+      }
+
+      if (!workspaces || workspaces.length === 0) {
+        console.warn('No workspaces found for user');
+        return null;
+      }
+
+      // Store the first workspace (or could add logic to select default)
+      const workspace = workspaces[0];
+      this.storage.setWorkspace(workspace);
+
+      console.log(`Stored workspace: ${workspace.name} (${workspace.slug || workspace.handle})`);
+
+      return workspace;
+    } catch (error) {
+      console.error('Failed to fetch workspaces:', error);
+      // Don't throw - workspace is not critical for initial auth
+      return null;
     }
   }
 
