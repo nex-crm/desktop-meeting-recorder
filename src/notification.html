@@ -160,43 +160,25 @@
   </div>
 
   <script>
-    const { ipcRenderer } = require('electron');
-
     // Handle close button
     document.getElementById('closeBtn').addEventListener('click', () => {
-      ipcRenderer.send('close-notification');
+      window.electronAPI.closeNotification();
     });
 
     // Handle dismiss button
     document.getElementById('dismissBtn').addEventListener('click', () => {
-      ipcRenderer.send('close-notification');
+      window.electronAPI.closeNotification();
     });
 
     // Handle action button
     document.getElementById('actionBtn').addEventListener('click', () => {
-      ipcRenderer.send('notification-action', 'start-recording');
-      ipcRenderer.send('close-notification');
-    });
-
-    // Listen for notification data
-    ipcRenderer.on('notification-data', (event, data) => {
-      if (data.title) {
-        document.getElementById('notificationTitle').textContent = data.title;
-      }
-      if (data.body) {
-        document.getElementById('notificationBody').textContent = data.body;
-      }
-      if (data.platform) {
-        document.getElementById('platformBadge').textContent = data.platform.toUpperCase();
-      }
-      if (data.actionText) {
-        document.getElementById('actionBtn').textContent = data.actionText;
-      }
+      window.electronAPI.sendNotificationAction('start-recording');
+      window.electronAPI.closeNotification();
     });
 
     // Auto-close after 10 seconds
     setTimeout(() => {
-      ipcRenderer.send('close-notification');
+      window.electronAPI.closeNotification();
     }, 10000);
   </script>
 </body>

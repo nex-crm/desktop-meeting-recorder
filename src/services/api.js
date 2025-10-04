@@ -14,178 +14,257 @@ class NexApiService {
 
   // Calendar endpoints
   async getUpcomingMeetings(hours = 24) {
-    const now = new Date();
-    // const to = new Date(now.getTime() + (hours * 60 * 60 * 1000)); // Will be used when real API is available
+    try {
+      const workspaceSlug = this.authService.storage.getWorkspaceSlug();
 
-    // TODO: Replace with actual API call when BE team delivers the new endpoint
-    // Mock data for development - matching the screenshot
-    const mockMeetings = [];
+      if (!workspaceSlug) {
+        console.warn('No workspace slug available, cannot fetch meetings');
+        return { meetings: [] };
+      }
 
-    // Helper to create date for today with specific time
-    const todayAt = (hours, minutes) => {
-      const d = new Date(now);
-      d.setHours(hours, minutes, 0, 0);
-      return d;
-    };
+      const now = new Date();
+      const to = new Date(now.getTime() + (hours * 60 * 60 * 1000));
 
-    // Helper to create date for tomorrow with specific time
-    const tomorrowAt = (hours, minutes) => {
-      const d = new Date(now);
-      d.setDate(d.getDate() + 1);
-      d.setHours(hours, minutes, 0, 0);
-      return d;
-    };
+      const requestBody = {
+        from_time: now.toISOString(),
+        to_time: to.toISOString(),
+        limit: 50,
+        sort_order: 'SORT_ORDER_ASC'
+      };
 
-    // Meeting starting in 55 seconds for testing notification (to trigger 1-minute notification quickly)
-    const testMeetingTime = new Date(now.getTime() + 55 * 1000); // 55 seconds from now
-    mockMeetings.push({
-      id: 1,
-      title: 'Weekly team catchup',
-      startTime: testMeetingTime.toISOString(),
-      endTime: new Date(testMeetingTime.getTime() + 30 * 60 * 1000).toISOString(), // 30 minute meeting
-      date: testMeetingTime.toISOString(),
-      organizerEmail: 'founder@company.com',
-      location: 'Conference Room',
-      videoMeetingUrl: 'https://meet.google.com/abc-defg-hij',
-      attendees: ['cofounder@company.com', 'cto@company.com']
-    });
+      console.log(`Fetching meetings from ${requestBody.from_time} to ${requestBody.to_time}`);
 
-    mockMeetings.push({
-      id: 2,
-      title: 'Weekly team catchup',
-      startTime: todayAt(14, 0).toISOString(),
-      endTime: todayAt(14, 30).toISOString(),
-      date: todayAt(14, 0).toISOString(),
-      organizerEmail: 'manager@company.com',
-      location: 'Virtual',
-      videoMeetingUrl: 'https://meet.google.com/abc-defg-hij',
-      attendees: ['dev1@company.com', 'dev2@company.com', 'dev3@company.com']
-    });
+      const response = await this.client.post(`/v1/workspaces/${workspaceSlug}/meetings`, requestBody);
 
-    mockMeetings.push({
-      id: 3,
-      title: '30 Min Meeting between Najmuzzaman Mohammed and Sarah Chen',
-      startTime: todayAt(20, 0).toISOString(),
-      endTime: todayAt(20, 30).toISOString(),
-      date: todayAt(20, 0).toISOString(),
-      organizerEmail: 'najmuzzaman@company.com',
-      location: 'Virtual',
-      videoMeetingUrl: 'https://teams.microsoft.com/l/meetup-join/19:meeting_abc',
-      attendees: ['sarah.chen@company.com']
-    });
+      // Extract meetings from response
+      const apiMeetings = response.data?.meetings || response.data?.data?.meetings || [];
 
-    // Tomorrow's meetings
-    mockMeetings.push({
-      id: 4,
-      title: '30 Min Meeting between Najmuzzaman Mohammed and Alex Kim',
-      startTime: tomorrowAt(16, 0).toISOString(),
-      endTime: tomorrowAt(16, 30).toISOString(),
-      date: tomorrowAt(16, 0).toISOString(),
-      organizerEmail: 'najmuzzaman@company.com',
-      location: 'Virtual',
-      videoMeetingUrl: 'https://zoom.us/j/987654321',
-      attendees: ['alex.kim@partner.com']
-    });
+      console.log(`Fetched ${apiMeetings.length} meetings from List API, enriching with participant data...`);
 
-    mockMeetings.push({
-      id: 5,
-      title: 'Atlas Customer Appointments (Najmuzzaman Mohammed)',
-      startTime: tomorrowAt(16, 30).toISOString(),
-      endTime: tomorrowAt(17, 30).toISOString(),
-      date: tomorrowAt(16, 30).toISOString(),
-      organizerEmail: 'najmuzzaman@company.com',
-      location: 'Customer Site',
-      attendees: ['customer1@atlas.com', 'customer2@atlas.com']
-    });
+      // Enrich each meeting with participant data from Get Meeting API
+      const enrichedMeetings = await Promise.all(
+        apiMeetings.map(async (meeting) => {
+          try {
+            const detailsResponse = await this.client.get(`/v1/workspaces/${workspaceSlug}/meetings/${meeting.id}`);
+            const meetingDetails = detailsResponse.data?.meeting || detailsResponse.data;
 
-    // Additional meetings in the next 2 hours for testing
-    const in15minutes = new Date(now.getTime() + 15 * 60 * 1000);
-    mockMeetings.push({
-      id: 6,
-      title: 'Product Demo with Potential Client',
-      startTime: in15minutes.toISOString(),
-      endTime: new Date(in15minutes.getTime() + 45 * 60 * 1000).toISOString(),
-      date: in15minutes.toISOString(),
-      organizerEmail: 'sales@company.com',
-      location: 'Virtual',
-      videoMeetingUrl: 'https://zoom.us/j/555666777',
-      attendees: ['client@potential.com', 'sales@company.com']
-    });
+            // Transform participants to attendees format
+            const attendees = (meetingDetails.participants || []).map(participant => ({
+              email: participant.email,
+              name: participant.name || participant.email?.split('@')[0],
+              status: participant.status,
+              isOrganizer: participant.isOrganizer || false,
+              isSelf: participant.isSelf || false,
+              entityId: participant.entityId,
+              photo_url: participant.photo_url || participant.photoUrl,
+              title: participant.title || participant.role
+            }));
 
-    const in30minutes = new Date(now.getTime() + 30 * 60 * 1000);
-    mockMeetings.push({
-      id: 7,
-      title: 'Engineering Sprint Planning',
-      startTime: in30minutes.toISOString(),
-      endTime: new Date(in30minutes.getTime() + 60 * 60 * 1000).toISOString(),
-      date: in30minutes.toISOString(),
-      organizerEmail: 'scrum.master@company.com',
-      location: 'Conference Room B',
-      videoMeetingUrl: 'https://meet.google.com/xyz-uvwx-abc',
-      attendees: ['dev1@company.com', 'dev2@company.com', 'dev3@company.com', 'qa@company.com']
-    });
+            return {
+              id: meeting.id,
+              title: meeting.title || 'Untitled Meeting',
+              startTime: meeting.startTime,
+              endTime: meeting.endTime,
+              date: meeting.startTime,
+              description: meeting.description,
+              videoMeetingUrl: meeting.videoMeeting?.url,
+              videoMeetingType: meeting.videoMeeting?.type,
+              attendees,
+              calendarEventId: meeting.calendar_event_id || meeting.calendarEventId
+            };
+          } catch (error) {
+            console.error(`Failed to fetch details for meeting ${meeting.id}:`, error);
+            // Return basic meeting info without participants on error
+            return {
+              id: meeting.id,
+              title: meeting.title || 'Untitled Meeting',
+              startTime: meeting.startTime,
+              endTime: meeting.endTime,
+              date: meeting.startTime,
+              description: meeting.description,
+              videoMeetingUrl: meeting.videoMeeting?.url,
+              attendees: [],
+              calendarEventId: meeting.calendar_event_id || meeting.calendarEventId
+            };
+          }
+        })
+      );
 
-    const in45minutes = new Date(now.getTime() + 45 * 60 * 1000);
-    mockMeetings.push({
-      id: 8,
-      title: 'Marketing Campaign Review',
-      startTime: in45minutes.toISOString(),
-      endTime: new Date(in45minutes.getTime() + 30 * 60 * 1000).toISOString(),
-      date: in45minutes.toISOString(),
-      organizerEmail: 'marketing@company.com',
-      location: 'Virtual',
-      videoMeetingUrl: 'https://teams.microsoft.com/l/meetup-join/19:meeting_xyz',
-      attendees: ['marketing@company.com', 'content@company.com', 'design@company.com']
-    });
+      console.log(`Enriched ${enrichedMeetings.length} meetings with participant data`);
 
-    const in60minutes = new Date(now.getTime() + 60 * 60 * 1000);
-    mockMeetings.push({
-      id: 9,
-      title: 'One-on-One: Manager & Senior Dev',
-      startTime: in60minutes.toISOString(),
-      endTime: new Date(in60minutes.getTime() + 30 * 60 * 1000).toISOString(),
-      date: in60minutes.toISOString(),
-      organizerEmail: 'manager@company.com',
-      location: 'Manager Office',
-      videoMeetingUrl: 'https://zoom.us/j/111222333',
-      attendees: ['senior.dev@company.com']
-    });
+      return {
+        meetings: enrichedMeetings
+      };
+    } catch (error) {
+      console.error('Failed to fetch meetings from API:', error);
 
-    const in90minutes = new Date(now.getTime() + 90 * 60 * 1000);
-    mockMeetings.push({
-      id: 10,
-      title: 'Customer Success Weekly Sync',
-      startTime: in90minutes.toISOString(),
-      endTime: new Date(in90minutes.getTime() + 45 * 60 * 1000).toISOString(),
-      date: in90minutes.toISOString(),
-      organizerEmail: 'cs.lead@company.com',
-      location: 'Virtual',
-      videoMeetingUrl: 'https://meet.google.com/customer-success-sync',
-      attendees: ['cs1@company.com', 'cs2@company.com', 'support@company.com']
-    });
-
-    const in120minutes = new Date(now.getTime() + 120 * 60 * 1000);
-    mockMeetings.push({
-      id: 11,
-      title: 'Design System Workshop',
-      startTime: in120minutes.toISOString(),
-      endTime: new Date(in120minutes.getTime() + 90 * 60 * 1000).toISOString(),
-      date: in120minutes.toISOString(),
-      organizerEmail: 'design.lead@company.com',
-      location: 'Design Studio',
-      videoMeetingUrl: 'https://zoom.us/j/design-workshop-2024',
-      attendees: ['designer1@company.com', 'designer2@company.com', 'ux@company.com', 'frontend@company.com']
-    });
-
-    console.log(`Returning ${mockMeetings.length} mock meetings`);
-    return {
-      meetings: mockMeetings
-    };
+      // Return empty array on error rather than failing completely
+      return { meetings: [] };
+    }
   }
 
-  async getMeetingDetails(eventId) {
-    const response = await this.client.get(`/v1/calendar/meetings/${eventId}`);
-    return response.data;
+  async getMeetingDetails(meetingId) {
+    try {
+      const workspaceSlug = this.authService.storage.getWorkspaceSlug();
+
+      if (!workspaceSlug) {
+        throw new Error('No workspace slug available');
+      }
+
+      const response = await this.client.get(`/v1/workspaces/${workspaceSlug}/meetings/${meetingId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to fetch meeting details for ${meetingId}:`, error);
+      throw error;
+    }
+  }
+
+  async getMeetingTranscript(meetingId) {
+    try {
+      const workspaceSlug = this.authService.storage.getWorkspaceSlug();
+
+      if (!workspaceSlug) {
+        throw new Error('No workspace slug available');
+      }
+
+      const response = await this.client.get(`/v1/workspaces/${workspaceSlug}/meetings/${meetingId}/transcript`);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to fetch transcript for meeting ${meetingId}:`, error);
+      throw error;
+    }
+  }
+
+  async getMeetingVideoUrl(meetingId) {
+    try {
+      const workspaceSlug = this.authService.storage.getWorkspaceSlug();
+
+      if (!workspaceSlug) {
+        throw new Error('No workspace slug available');
+      }
+
+      const response = await this.client.get(`/v1/workspaces/${workspaceSlug}/meetings/${meetingId}/video`);
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to fetch video URL for meeting ${meetingId}:`, error);
+      throw error;
+    }
+  }
+
+  async getMeetingSummary(meetingId) {
+    try {
+      const workspaceSlug = this.authService.storage.getWorkspaceSlug();
+
+      if (!workspaceSlug) {
+        throw new Error('No workspace slug available');
+      }
+
+      const response = await this.client.get(`/v1/workspaces/${workspaceSlug}/meetings/${meetingId}/summary`);
+      return response.data;
+    } catch (error) {
+      // Handle 501 Not Implemented gracefully
+      if (error.response?.status === 501) {
+        console.log(`Summary endpoint not yet implemented for meeting ${meetingId}`);
+        return null;
+      }
+      console.error(`Failed to fetch summary for meeting ${meetingId}:`, error);
+      throw error;
+    }
+  }
+
+  async updateMeetingSummary(meetingId, content) {
+    try {
+      const workspaceSlug = this.authService.storage.getWorkspaceSlug();
+
+      if (!workspaceSlug) {
+        throw new Error('No workspace slug available');
+      }
+
+      const response = await this.client.post(
+        `/v1/workspaces/${workspaceSlug}/meetings/${meetingId}/summary`,
+        { content }
+      );
+      return response.data;
+    } catch (error) {
+      // Handle 501 Not Implemented gracefully
+      if (error.response?.status === 501) {
+        console.log(`Update summary endpoint not yet implemented for meeting ${meetingId}`);
+        return null;
+      }
+      console.error(`Failed to update summary for meeting ${meetingId}:`, error);
+      throw error;
+    }
+  }
+
+  async getMeetingPrep(meetingId) {
+    try {
+      const workspaceSlug = this.authService.storage.getWorkspaceSlug();
+
+      if (!workspaceSlug) {
+        throw new Error('No workspace slug available');
+      }
+
+      const response = await this.client.get(`/v1/workspaces/${workspaceSlug}/meetings/${meetingId}/prep`);
+      return response.data;
+    } catch (error) {
+      // Handle 501 Not Implemented gracefully
+      if (error.response?.status === 501) {
+        console.log(`Prep endpoint not yet implemented for meeting ${meetingId}`);
+        return null;
+      }
+      console.error(`Failed to fetch prep for meeting ${meetingId}:`, error);
+      throw error;
+    }
+  }
+
+  async updateMeetingPrep(meetingId, content) {
+    try {
+      const workspaceSlug = this.authService.storage.getWorkspaceSlug();
+
+      if (!workspaceSlug) {
+        throw new Error('No workspace slug available');
+      }
+
+      const response = await this.client.post(
+        `/v1/workspaces/${workspaceSlug}/meetings/${meetingId}/prep`,
+        { content }
+      );
+      return response.data;
+    } catch (error) {
+      // Handle 501 Not Implemented gracefully
+      if (error.response?.status === 501) {
+        console.log(`Update prep endpoint not yet implemented for meeting ${meetingId}`);
+        return null;
+      }
+      console.error(`Failed to update prep for meeting ${meetingId}:`, error);
+      throw error;
+    }
+  }
+
+  async regenerateMeetingPrep(meetingId, prompt = null) {
+    try {
+      const workspaceSlug = this.authService.storage.getWorkspaceSlug();
+
+      if (!workspaceSlug) {
+        throw new Error('No workspace slug available');
+      }
+
+      const requestBody = prompt ? { prompt } : {};
+
+      const response = await this.client.post(
+        `/v1/workspaces/${workspaceSlug}/meetings/${meetingId}/prep/regenerate`,
+        requestBody
+      );
+      return response.data;
+    } catch (error) {
+      // Handle 501 Not Implemented gracefully
+      if (error.response?.status === 501) {
+        console.log(`Regenerate prep endpoint not yet implemented for meeting ${meetingId}`);
+        return null;
+      }
+      console.error(`Failed to regenerate prep for meeting ${meetingId}:`, error);
+      throw error;
+    }
   }
 
   async notifyRecordingIntent(eventId) {

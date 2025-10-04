@@ -28,7 +28,7 @@ module.exports = {
   },
 
   NOTIFICATIONS: {
-    MEETING_REMINDER_MINUTES: [15, 5, 1], // Remind at these intervals before meeting
+    MEETING_REMINDER_MINUTES: [1], // Remind at these intervals before meeting
     DEFAULT_NOTIFICATION_SOUND: true,
   },
 

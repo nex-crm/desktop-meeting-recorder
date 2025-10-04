@@ -106,6 +106,7 @@ class SecureStorage {
     this.store.set('workspace', {
       id: workspace.id,
       name: workspace.name,
+      slug: workspace.slug || workspace.handle || workspace.id,
       settings: workspace.settings,
       updatedAt: Date.now(),
     });
@@ -113,6 +114,11 @@ class SecureStorage {
 
   getWorkspace() {
     return this.store.get('workspace');
+  }
+
+  getWorkspaceSlug() {
+    const workspace = this.getWorkspace();
+    return workspace?.slug;
   }
 
   clear() {
