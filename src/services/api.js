@@ -23,10 +23,12 @@ class NexApiService {
       }
 
       const now = new Date();
+      // Include meetings that started up to 4 hours ago (to catch currently running meetings)
+      const from = new Date(now.getTime() - (4 * 60 * 60 * 1000));
       const to = new Date(now.getTime() + (hours * 60 * 60 * 1000));
 
       const requestBody = {
-        from_time: now.toISOString(),
+        from_time: from.toISOString(),
         to_time: to.toISOString(),
         limit: 50,
         sort_order: 'SORT_ORDER_ASC'
@@ -92,8 +94,17 @@ class NexApiService {
 
       console.log(`Enriched ${enrichedMeetings.length} meetings with participant data`);
 
+      // Filter out meetings that have already ended
+      const now = new Date();
+      const activeMeetings = enrichedMeetings.filter(meeting => {
+        const endTime = new Date(meeting.endTime);
+        return endTime >= now;
+      });
+
+      console.log(`Filtered to ${activeMeetings.length} active/upcoming meetings (${enrichedMeetings.length - activeMeetings.length} already ended)`);
+
       return {
-        meetings: enrichedMeetings
+        meetings: activeMeetings
       };
     } catch (error) {
       console.error('Failed to fetch meetings from API:', error);
