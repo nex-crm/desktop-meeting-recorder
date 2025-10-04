@@ -1907,9 +1907,13 @@ let calendarMeetings = [];
 // Fetch calendar meetings from API
 async function fetchCalendarMeetings() {
   try {
+    console.log('Fetching calendar meetings from API...');
     const result = await window.electronAPI.calendar.getUpcomingMeetings(24); // Next 24 hours
+    console.log('API result:', result);
+
     if (result.success && result.meetings && Array.isArray(result.meetings)) {
       console.log('Fetched', result.meetings.length, 'upcoming meetings from API');
+      console.log('Meetings data:', result.meetings);
       calendarMeetings = result.meetings;
 
       // Sort meetings by start time
@@ -1919,7 +1923,7 @@ async function fetchCalendarMeetings() {
         return dateA - dateB;
       });
     } else {
-      console.log('No meetings returned from API or invalid format');
+      console.log('No meetings returned from API or invalid format. Result:', result);
       calendarMeetings = [];
     }
   } catch (error) {
@@ -1933,8 +1937,10 @@ function renderMeetings() {
   const mainContent = document.querySelector('.main-content .content-container');
   mainContent.innerHTML = '';
 
-  // Create "Coming up" section for upcoming meetings
-  if (calendarMeetings && calendarMeetings.length > 0) {
+  console.log('Rendering meetings. Calendar meetings count:', calendarMeetings.length);
+
+  // Create "Coming up" section - always show it with refresh button
+  if (true) { // Always render the section
     const upcomingSection = document.createElement('section');
     upcomingSection.className = 'upcoming-section';
 
@@ -1991,12 +1997,16 @@ function renderMeetings() {
     // Function to render meetings
     const renderUpcomingMeetings = (meetings) => {
       upcomingContainer.innerHTML = '';
-      meetings.forEach(meeting => {
-        upcomingContainer.appendChild(createUpcomingMeetingCard(meeting));
-      });
+      if (meetings.length === 0) {
+        upcomingContainer.innerHTML = '<p style="color: #6B7280; padding: 20px; text-align: center;">No upcoming meetings</p>';
+      } else {
+        meetings.forEach(meeting => {
+          upcomingContainer.appendChild(createUpcomingMeetingCard(meeting));
+        });
+      }
     };
 
-    // Initially show first 4 meetings
+    // Initially show first 4 meetings or empty state
     renderUpcomingMeetings(weekMeetings.slice(0, 4));
 
     // Handle show more button
