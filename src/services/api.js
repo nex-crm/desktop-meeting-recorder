@@ -95,10 +95,9 @@ class NexApiService {
       console.log(`Enriched ${enrichedMeetings.length} meetings with participant data`);
 
       // Filter out meetings that have already ended
-      const now = new Date();
       const activeMeetings = enrichedMeetings.filter(meeting => {
         const endTime = new Date(meeting.endTime);
-        return endTime >= now;
+        return endTime >= now; // using 'now' from line 25
       });
 
       console.log(`Filtered to ${activeMeetings.length} active/upcoming meetings (${enrichedMeetings.length - activeMeetings.length} already ended)`);
