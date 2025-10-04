@@ -2003,17 +2003,22 @@ function renderMeetings() {
 
     // Function to render meetings
     const renderUpcomingMeetings = (meetings) => {
+      console.log('renderUpcomingMeetings called with', meetings.length, 'meetings');
       upcomingContainer.innerHTML = '';
       if (meetings.length === 0) {
+        console.log('No meetings to render, showing empty state');
         upcomingContainer.innerHTML = '<p style="color: #6B7280; padding: 20px; text-align: center;">No upcoming meetings</p>';
       } else {
-        meetings.forEach(meeting => {
+        console.log('Rendering', meetings.length, 'meeting cards');
+        meetings.forEach((meeting, index) => {
+          console.log(`Creating card ${index + 1} for meeting:`, meeting.title);
           upcomingContainer.appendChild(createUpcomingMeetingCard(meeting));
         });
       }
     };
 
     // Initially show first 4 meetings or empty state
+    console.log('About to render, weekMeetings:', weekMeetings);
     renderUpcomingMeetings(weekMeetings.slice(0, 4));
 
     // Handle show more button
