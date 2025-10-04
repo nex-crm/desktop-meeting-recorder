@@ -17,10 +17,8 @@ class NexApiService {
     try {
       const workspaceSlug = this.authService.storage.getWorkspaceSlug();
 
-      console.log('📅 getUpcomingMeetings - workspace slug:', workspaceSlug);
-
       if (!workspaceSlug) {
-        console.error('❌ No workspace slug available, cannot fetch meetings');
+        console.warn('No workspace slug available, cannot fetch meetings');
         return { meetings: [] };
       }
 

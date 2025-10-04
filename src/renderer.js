@@ -1907,14 +1907,9 @@ let calendarMeetings = [];
 // Fetch calendar meetings from API
 async function fetchCalendarMeetings() {
   try {
-    console.log('Fetching calendar meetings from API...');
     const result = await window.electronAPI.calendar.getUpcomingMeetings(24); // Next 24 hours
-    console.log('API result:', result);
 
     if (result.success && result.meetings && Array.isArray(result.meetings)) {
-      console.log('Fetched', result.meetings.length, 'upcoming meetings from API');
-      console.log('First meeting details:', result.meetings[0]);
-      console.log('Meeting startTime:', result.meetings[0]?.startTime, 'endTime:', result.meetings[0]?.endTime);
       calendarMeetings = result.meetings;
 
       // Sort meetings by start time
@@ -1924,7 +1919,6 @@ async function fetchCalendarMeetings() {
         return dateA - dateB;
       });
     } else {
-      console.log('No meetings returned from API or invalid format. Result:', result);
       calendarMeetings = [];
     }
   } catch (error) {
@@ -1937,8 +1931,6 @@ function renderMeetings() {
   // Clear previous content
   const mainContent = document.querySelector('.main-content .content-container');
   mainContent.innerHTML = '';
-
-  console.log('Rendering meetings. Calendar meetings count:', calendarMeetings.length);
 
   // Create "Coming up" section - always show it with refresh button
   if (true) { // Always render the section
@@ -1963,8 +1955,6 @@ function renderMeetings() {
     const todayMeetings = sortedMeetings.filter(meeting => {
       const meetingStart = new Date(meeting.startTime);
       const meetingEnd = new Date(meeting.endTime);
-      console.log('Filtering meeting:', meeting.title, 'Start:', meetingStart, 'End:', meetingEnd, 'Now:', now);
-      console.log('meetingEnd >= now:', meetingEnd >= now, 'meetingStart <= endOfToday:', meetingStart <= endOfToday);
       // Show if meeting hasn't ended yet (includes ongoing meetings)
       return meetingEnd >= now && meetingStart <= endOfToday;
     });
@@ -1972,13 +1962,9 @@ function renderMeetings() {
     const weekMeetings = sortedMeetings.filter(meeting => {
       const meetingStart = new Date(meeting.startTime);
       const meetingEnd = new Date(meeting.endTime);
-      console.log('Week filter - meeting:', meeting.title, 'meetingEnd >= now:', meetingEnd >= now, 'meetingStart <= endOfWeek:', meetingStart <= endOfWeek);
       // Show if meeting hasn't ended yet (includes ongoing meetings)
       return meetingEnd >= now && meetingStart <= endOfWeek;
     });
-
-    console.log('Today meetings count:', todayMeetings.length);
-    console.log('Week meetings count:', weekMeetings.length);
 
     let showingAll = false;
     const hasMoreMeetings = weekMeetings.length > 4;
@@ -2003,22 +1989,17 @@ function renderMeetings() {
 
     // Function to render meetings
     const renderUpcomingMeetings = (meetings) => {
-      console.log('renderUpcomingMeetings called with', meetings.length, 'meetings');
       upcomingContainer.innerHTML = '';
       if (meetings.length === 0) {
-        console.log('No meetings to render, showing empty state');
         upcomingContainer.innerHTML = '<p style="color: #6B7280; padding: 20px; text-align: center;">No upcoming meetings</p>';
       } else {
-        console.log('Rendering', meetings.length, 'meeting cards');
-        meetings.forEach((meeting, index) => {
-          console.log(`Creating card ${index + 1} for meeting:`, meeting.title);
+        meetings.forEach(meeting => {
           upcomingContainer.appendChild(createUpcomingMeetingCard(meeting));
         });
       }
     };
 
     // Initially show first 4 meetings or empty state
-    console.log('About to render, weekMeetings:', weekMeetings);
     renderUpcomingMeetings(weekMeetings.slice(0, 4));
 
     // Handle show more button
