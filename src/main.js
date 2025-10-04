@@ -52,6 +52,8 @@ if (require('electron-squirrel-startup')) {
 let detectedMeeting = null;
 // Track meetings that have already been handled in this session
 let handledMeetingSessions = new Set();
+// Track which recordings have already sent completion events
+let processedRecordingCompletions = new Set();
 
 let mainWindow;
 let notificationWindow = null;
@@ -174,12 +176,14 @@ const createNotificationWindow = (data = {}) => {
     const teamsSvg = fs.readFileSync(path.join(logosPath, 'teams.svg'), 'utf8');
     const meetSvg = fs.readFileSync(path.join(logosPath, 'meet.svg'), 'utf8');
     const webexSvg = fs.readFileSync(path.join(logosPath, 'webex.svg'), 'utf8');
+    const roamSvg = fs.readFileSync(path.join(logosPath, 'roam.svg'), 'utf8');
 
     // Convert to data URLs
     platformLogos.zoom = `data:image/svg+xml;base64,${Buffer.from(zoomSvg).toString('base64')}`;
     platformLogos.teams = `data:image/svg+xml;base64,${Buffer.from(teamsSvg).toString('base64')}`;
     platformLogos.meet = `data:image/svg+xml;base64,${Buffer.from(meetSvg).toString('base64')}`;
     platformLogos.webex = `data:image/svg+xml;base64,${Buffer.from(webexSvg).toString('base64')}`;
+    platformLogos.roam = `data:image/svg+xml;base64,${Buffer.from(roamSvg).toString('base64')}`;
   } catch (err) {
     console.error('Error loading platform logos from', logosPath, ':', err);
     // Fallback to empty logos
@@ -187,6 +191,7 @@ const createNotificationWindow = (data = {}) => {
     platformLogos.teams = '';
     platformLogos.meet = '';
     platformLogos.webex = '';
+    platformLogos.roam = '';
   }
 
   // Check for platform from data or meeting URL
@@ -216,6 +221,9 @@ const createNotificationWindow = (data = {}) => {
     } else if (data.meeting.videoMeetingUrl.includes('webex')) {
       platformLogo = platformLogos.webex;
       platformName = 'WebEx';
+    } else if (data.meeting.videoMeetingUrl.includes('ro.am')) {
+      platformLogo = platformLogos.roam;
+      platformName = 'Roam';
     }
   } else if (data.platform === 'TEST') {
     platformName = 'Test';
@@ -659,8 +667,17 @@ app.whenReady().then(async () => {
   // Initialize calendar service with API service and storage
   calendarService = new CalendarSyncService(apiService, authService.storage);
 
-  // Initialize calendar sync after successful auth
+  // Check if workspace needs to be fetched (for users who logged in before workspace fetching was added)
   if (authService.isAuthenticated()) {
+    const workspace = authService.storage.getWorkspace();
+    if (!workspace || !workspace.slug) {
+      console.log('No workspace found, fetching workspace info...');
+      await authService.fetchAndStoreWorkspace().catch(error => {
+        console.error('Failed to fetch workspace on startup:', error);
+      });
+    }
+
+    // Initialize calendar sync after successful auth
     calendarService.initialize().catch(error => {
       console.error('Failed to initialize calendar sync:', error);
     });
@@ -729,9 +746,22 @@ app.whenReady().then(async () => {
     }
   });
 
+  ipcMain.handle('auth:fetchWorkspace', async () => {
+    try {
+      console.log('Manual workspace fetch requested');
+      const workspace = await authService.fetchAndStoreWorkspace();
+      console.log('Workspace fetched:', workspace);
+      return { success: true, workspace };
+    } catch (error) {
+      console.error('Failed to fetch workspace:', error);
+      return { success: false, error: error.message, details: error.response?.data };
+    }
+  });
+
   ipcMain.handle('auth:getWorkspace', async () => {
     try {
-      const workspace = authService.getWorkspace();
+      const workspace = authService.storage.getWorkspace();
+      console.log('Current workspace in storage:', workspace);
       return { success: true, workspace };
     } catch (error) {
       return { success: false, error: error.message };
@@ -1806,10 +1836,10 @@ ipcMain.handle('startManualRecording', async (event, meetingId) => {
   }
 });
 
-// Handle stopping a manual desktop recording
-ipcMain.handle('stopManualRecording', async (event, recordingId) => {
+// Handle generating summary (stops recording and triggers summary generation)
+async function handleGenerateSummary(recordingId) {
   try {
-    console.log(`Stopping manual desktop recording: ${recordingId}`);
+    console.log(`Generating summary for recording: ${recordingId}`);
 
     // Stop the recording - using the windowId property as shown in the reference
 
@@ -1828,11 +1858,22 @@ ipcMain.handle('stopManualRecording', async (event, recordingId) => {
     // The recording-ended event will be triggered automatically,
     // which will handle uploading and generating the summary
 
+    // However, also trigger updateNoteWithRecordingInfo directly as a fallback
+    // in case the recording-ended event doesn't fire (e.g., very short recordings)
+    setTimeout(async () => {
+      console.log('Fallback: Triggering updateNoteWithRecordingInfo after 2 seconds');
+      await updateNoteWithRecordingInfo(recordingId);
+    }, 2000);
+
     return { success: true };
   } catch (error) {
-    console.error('Error stopping manual recording:', error);
+    console.error('Error generating summary:', error);
     return { success: false, error: error.message };
   }
+}
+
+ipcMain.handle('generateSummary', async (event, recordingId) => {
+  return handleGenerateSummary(recordingId);
 });
 
 // Test notification handler
@@ -1895,6 +1936,37 @@ ipcMain.handle('testNotification', async () => {
 });
 
 // Handle generating AI summary with streaming
+// Handler to trigger summary generation using the same path as recording completion
+ipcMain.handle('triggerSummaryGeneration', async (event, meetingId) => {
+  try {
+    console.log(`Manual summary generation triggered for meeting: ${meetingId}`);
+
+    // Read current data to get the recording ID
+    const fileData = await fs.promises.readFile(meetingsFilePath, 'utf8');
+    const meetingsData = JSON.parse(fileData);
+
+    // Find the meeting
+    const meeting = [...meetingsData.pastMeetings, ...meetingsData.upcomingMeetings]
+      .find(m => m.id === meetingId);
+
+    if (!meeting) {
+      return { success: false, error: 'Meeting not found' };
+    }
+
+    if (!meeting.recordingId) {
+      return { success: false, error: 'No recording ID found for this meeting' };
+    }
+
+    // Call the exact same function that stop recording uses
+    await updateNoteWithRecordingInfo(meeting.recordingId);
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error triggering summary generation:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 ipcMain.handle('generateMeetingSummaryStreaming', async (event, meetingId) => {
   try {
     console.log(`Streaming summary generation requested for meeting: ${meetingId}`);
@@ -1984,8 +2056,19 @@ ipcMain.handle('generateMeetingSummaryStreaming', async (event, meetingId) => {
 
     console.log('Updated meeting note with AI summary (streaming)');
 
+    // Send final summary update with completed flag
+    console.log('📤 Sending final summary-update with completed flag for meeting:', meetingId);
+    mainWindow.webContents.send('summary-update', {
+      meetingId,
+      aiSummary: meeting.aiSummary,
+      completed: true
+    });
+    console.log('✅ Final summary-update sent with completed: true');
+
     // Final notification to renderer
+    console.log('🔥 SENDING summary-generated event for meeting:', meetingId);
     mainWindow.webContents.send('summary-generated', meetingId);
+    console.log('✅ summary-generated event sent');
 
     return {
       success: true,
@@ -2592,6 +2675,25 @@ ${transcriptText}` }
 // Function to update a note with recording information when recording ends
 async function updateNoteWithRecordingInfo(recordingId) {
   try {
+    console.log(`updateNoteWithRecordingInfo called for recordingId: ${recordingId}`);
+
+    // Check if we've already processed this recording completion
+    if (processedRecordingCompletions.has(recordingId)) {
+      console.log('Recording completion already processed for:', recordingId);
+      return;
+    }
+
+    console.log(`Processing recording completion for: ${recordingId}`);
+
+    // Mark this recording as processed IMMEDIATELY to prevent race conditions
+    processedRecordingCompletions.add(recordingId);
+
+    // Clean up old entries (keep only last 20 to prevent memory leak)
+    if (processedRecordingCompletions.size > 20) {
+      const firstEntry = processedRecordingCompletions.values().next().value;
+      processedRecordingCompletions.delete(firstEntry);
+    }
+
     // Read the current meetings data
     let meetingsData;
     try {
@@ -2634,9 +2736,13 @@ async function updateNoteWithRecordingInfo(recordingId) {
     // Save the initial update
     await fileOperationManager.writeData(meetingsData);
 
-    // Generate AI summary if there's a transcript
+    // Always attempt to generate AI summary after recording ends
+    // This will be triggered immediately, but if there's no transcript yet,
+    // the summary will indicate that
+    console.log(`Attempting to generate AI summary for meeting ${meeting.id}...`);
+
     if (meeting.transcript && meeting.transcript.length > 0) {
-      console.log(`Generating AI summary for meeting ${meeting.id}...`);
+      console.log(`Transcript available, generating summary...`);
 
       // Log summary generation to console instead of showing a notification
       console.log('Generating AI summary for meeting: ' + meeting.id);
@@ -2726,6 +2832,29 @@ async function updateNoteWithRecordingInfo(recordingId) {
       await fileOperationManager.writeData(meetingsData);
 
       console.log('Updated meeting note with AI summary');
+
+      // Notify renderer that summary generation is complete
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('summary-generated', meeting.id);
+      }
+    } else {
+      // No transcript available yet - set a placeholder and save
+      console.log('No transcript available for summary generation');
+      meeting.aiSummary = 'No transcript available. The recording may not have captured any audio, or transcription is still in progress.';
+      meeting.hasSummary = false;
+
+      // Save the updated data
+      await fileOperationManager.writeData(meetingsData);
+
+      // Notify the renderer
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('summary-update', {
+          meetingId: meeting.id,
+          aiSummary: meeting.aiSummary
+        });
+        // Also send completion event even when no transcript
+        mainWindow.webContents.send('summary-generated', meeting.id);
+      }
     }
 
     // If the note is currently open, notify the renderer to refresh it
