@@ -299,9 +299,285 @@ body {
   margin-bottom: 4px;
 }
 
+.upcoming-meeting-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .upcoming-meeting-time {
   font-size: 13px;
   color: #6B7280;
+}
+
+.meeting-attendees {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.attendee-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  overflow: visible;
+  background: #E5E7EB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.attendee-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: #6B7280;
+  background: #E5E7EB;
+  border-radius: 50%;
+}
+
+.attendee-text {
+  font-size: 13px;
+  color: #6B7280;
+}
+
+/* Attendees Dropdown */
+.attendees-dropdown {
+  position: fixed;
+  background: white;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  padding: 16px;
+  min-width: 320px;
+  max-width: 400px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+}
+
+.attendees-dropdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.attendees-dropdown-header h3 {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6B7280;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.attendees-dropdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.attendee-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.attendee-item:hover {
+  background: #F3F4F6;
+}
+
+.attendee-item-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.attendee-avatar-large {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: visible;
+  background: #E5E7EB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.attendee-avatar-large img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.avatar-placeholder-large {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: #6B7280;
+  background: #E5E7EB;
+  border-radius: 50%;
+}
+
+.status-indicator {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid white;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.status-indicator svg {
+  width: 8px;
+  height: 8px;
+}
+
+/* Larger status indicators for dropdown avatars */
+.attendees-dropdown .status-indicator {
+  bottom: -2px;
+  right: -2px;
+  width: 16px;
+  height: 16px;
+  border: 2px solid white;
+}
+
+.attendees-dropdown .status-indicator svg {
+  width: 10px;
+  height: 10px;
+}
+
+.status-accepted {
+  background: white;
+}
+
+.status-declined {
+  background: white;
+}
+
+.status-tentative {
+  background: white;
+}
+
+.attendee-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.attendee-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #111827;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.attendee-title {
+  font-size: 12px;
+  color: #6B7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.attendee-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.attendee-action-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #F3F4F6;
+  border: none;
+  color: #6B7280;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.attendee-action-btn .email-icon {
+  display: block;
+}
+
+.attendee-action-btn .copy-icon {
+  display: none;
+}
+
+.attendee-action-btn:hover .email-icon {
+  display: none;
+}
+
+.attendee-action-btn:hover .copy-icon {
+  display: block;
+}
+
+.attendee-action-btn:hover {
+  background: #E5E7EB;
+  color: #111827;
+}
+
+.attendee-action-btn:active {
+  transform: scale(0.95);
+}
+
+.attendee-action-btn.copied::after {
+  content: 'Copied!';
+  position: absolute;
+  top: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #111827;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: fadeInOut 1.5s ease-in-out;
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translateX(-50%) translateY(5px); }
+  20% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  80% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-5px); }
 }
 
 /* Date sections */
@@ -695,10 +971,30 @@ body {
   color: var(--text-secondary);
 }
 
-.note-date, .note-author {
+.note-date, .note-author, .note-participants {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+}
+
+.note-participants {
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.note-participants:hover {
+  background: #f0f0f0;
+}
+
+.note-participants .attendee-avatar {
+  width: 20px;
+  height: 20px;
+}
+
+.note-participants .avatar-placeholder {
+  font-size: 10px;
 }
 
 /* Simple Editor (legacy - kept for backward compatibility) */

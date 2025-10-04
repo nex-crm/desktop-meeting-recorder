@@ -328,6 +328,64 @@ function updateRecordingButtonUI(isActive, recordingId) {
   }
 }
 
+
+// Function to show/hide spinner on record button during summarization
+window.setRecordButtonLoading = function(isLoading) {
+  const recordButton = document.getElementById('recordButton');
+  const generateBtn = document.getElementById('generateBtn');
+  if (!recordButton) return;
+
+  if (isLoading) {
+    // Hide the record button
+    recordButton.style.display = 'none';
+
+    // Disable the generate button while loading
+    if (generateBtn) {
+      generateBtn.disabled = true;
+      generateBtn.style.opacity = '0.5';
+      generateBtn.style.cursor = 'not-allowed';
+    }
+
+    // Create loading spinner element if it doesn't exist
+    let loadingSpinner = document.getElementById('recordButtonLoadingSpinner');
+    if (!loadingSpinner) {
+      loadingSpinner = document.createElement('div');
+      loadingSpinner.id = 'recordButtonLoadingSpinner';
+      loadingSpinner.style.cssText = 'display: flex; align-items: center; justify-content: center;';
+      loadingSpinner.innerHTML = `
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="animation: spin 1s linear infinite;">
+          <style>
+            @keyframes spin {
+              from { transform: rotate(0deg); }
+              to { transform: rotate(360deg); }
+            }
+          </style>
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" fill="currentColor" opacity="0.3"/>
+          <path d="M12 2v4c3.31 0 6 2.69 6 6h4c0-5.52-4.48-10-10-10z" fill="currentColor"/>
+        </svg>
+      `;
+      recordButton.parentNode.insertBefore(loadingSpinner, recordButton);
+    }
+    loadingSpinner.style.display = 'flex';
+  } else {
+    // Show the record button
+    recordButton.style.display = '';
+
+    // Re-enable the generate button
+    if (generateBtn) {
+      generateBtn.disabled = false;
+      generateBtn.style.opacity = '1';
+      generateBtn.style.cursor = 'pointer';
+    }
+
+    // Hide spinner
+    const loadingSpinner = document.getElementById('recordButtonLoadingSpinner');
+    if (loadingSpinner) {
+      loadingSpinner.style.display = 'none';
+    }
+  }
+}
+
 // Function to format date for section headers
 function formatDateHeader(dateString) {
   const date = new Date(dateString);
@@ -603,7 +661,7 @@ window.stopRecordingForMeeting = async function(meetingId) {
   console.log('Stopping recording for meeting:', meetingId);
   if (window.isRecording && window.currentRecordingId) {
     try {
-      const result = await window.electronAPI.stopManualRecording(window.currentRecordingId);
+      const result = await window.electronAPI.generateSummary(window.currentRecordingId);
       if (result.success) {
         console.log('Recording stopped successfully');
         // The UI will be updated by the recording state change event
@@ -633,6 +691,16 @@ window.generateSummaryForMeeting = async function(meetingId) {
     if (result.success) {
       console.log('Summary generation completed');
       // The UI will be updated by the summary update events
+
+      // Expand sidebar when summary is generated
+      const sidebar = document.getElementById('sidebar');
+      const editorContent = document.querySelector('.editor-content');
+      const chatInputContainer = document.querySelector('.chat-input-container');
+      if (sidebar && sidebar.classList.contains('hidden')) {
+        sidebar.classList.remove('hidden');
+        editorContent.classList.remove('full-width');
+        chatInputContainer.style.display = 'block';
+      }
     } else {
       console.error('Failed to generate summary:', result.error);
       alert('Failed to generate summary. Please try again.');
@@ -733,7 +801,7 @@ window.stopCurrentRecording = async function() {
   console.log('Stopping recording from future meeting indicator');
   if (window.isRecording && window.currentRecordingId) {
     try {
-      const result = await window.electronAPI.stopManualRecording(window.currentRecordingId);
+      const result = await window.electronAPI.generateSummary(window.currentRecordingId);
       if (result.success) {
         console.log('Recording stopped successfully');
         // The UI will be updated by the recording state change event
@@ -746,7 +814,128 @@ window.stopCurrentRecording = async function() {
   }
 };
 
+// Function to show attendees dropdown
+function showAttendeesDropdown(meeting, triggerElement) {
+  // Remove any existing dropdown
+  const existingDropdown = document.querySelector('.attendees-dropdown');
+  if (existingDropdown) {
+    existingDropdown.remove();
+    return; // Toggle behavior
+  }
 
+  const dropdown = document.createElement('div');
+  dropdown.className = 'attendees-dropdown';
+
+  // Filter out the logged-in user
+  const allAttendees = meeting.attendees || [];
+  const attendees = allAttendees.filter(attendee => !attendee.isSelf);
+
+  let attendeesListHtml = attendees.map(attendee => {
+    const attendeeName = attendee.name || attendee.email?.split('@')[0] || 'User';
+    const attendeeTitle = attendee.title || attendee.role || '';
+    const attendeeEmail = attendee.email || '';
+
+    // Get status indicator
+    let statusIndicator = '';
+    if (attendee.status === 'STATUS_ACCEPTED') {
+      statusIndicator = `
+        <div class="status-indicator status-accepted" title="Accepted">
+          <svg width="8" height="8" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M6 11.5L2.5 8L3.91 6.59L6 8.67L12.09 2.59L13.5 4L6 11.5Z" fill="#0F9D58"/>
+          </svg>
+        </div>
+      `;
+    } else if (attendee.status === 'STATUS_DECLINED') {
+      statusIndicator = `
+        <div class="status-indicator status-declined" title="Declined">
+          <svg width="8" height="8" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12.59 4L8 8.59L3.41 4L2 5.41L6.59 10L2 14.59L3.41 16L8 11.41L12.59 16L14 14.59L9.41 10L14 5.41L12.59 4Z" fill="#DB4437"/>
+          </svg>
+        </div>
+      `;
+    } else if (attendee.status === 'STATUS_TENTATIVE') {
+      statusIndicator = `
+        <div class="status-indicator status-tentative" title="Tentative">
+          <svg width="8" height="8" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M7 11H9V13H7V11ZM8 2C4.69 2 2 4.69 2 8C2 11.31 4.69 14 8 14C11.31 14 14 11.31 14 8C14 4.69 11.31 2 8 2ZM8 12.4C5.57 12.4 3.6 10.43 3.6 8C3.6 5.57 5.57 3.6 8 3.6C10.43 3.6 12.4 5.57 12.4 8C12.4 10.43 10.43 12.4 8 12.4ZM8 5C6.9 5 6 5.9 6 7H7.2C7.2 6.56 7.56 6.2 8 6.2C8.44 6.2 8.8 6.56 8.8 7C8.8 8.2 7 8.05 7 10H8.2C8.2 8.75 10 8.6 10 7C10 5.9 9.1 5 8 5Z" fill="#F4B400"/>
+          </svg>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="attendee-item">
+        <div class="attendee-item-left">
+          <div class="attendee-avatar-large">
+            ${attendee.photo_url ?
+              `<img src="${attendee.photo_url}" alt="${attendeeName}" />` :
+              `<div class="avatar-placeholder-large">${attendeeName.charAt(0).toUpperCase()}</div>`
+            }
+            ${statusIndicator}
+          </div>
+          <div class="attendee-info">
+            <div class="attendee-name">${attendeeName}</div>
+            ${attendeeTitle ? `<div class="attendee-title">${attendeeTitle}</div>` : ''}
+          </div>
+        </div>
+        <div class="attendee-actions">
+          ${attendeeEmail ? `
+            <button class="attendee-action-btn" data-email="${attendeeEmail}" title="Copy email">
+              <svg class="email-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M20 4H4C2.9 4 2.01 4.9 2.01 6L2 18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6C22 4.9 21.1 4 20 4ZM20 18H4V8L12 13L20 8V18ZM12 11L4 6H20L12 11Z" fill="currentColor"/>
+              </svg>
+              <svg class="copy-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M16 1H4C2.9 1 2 1.9 2 3V17H4V3H16V1ZM19 5H8C6.9 5 6 5.9 6 7V21C6 22.1 6.9 23 8 23H19C20.1 23 21 22.1 21 21V7C21 5.9 20.1 5 19 5ZM19 21H8V7H19V21Z" fill="currentColor"/>
+              </svg>
+            </button>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  dropdown.innerHTML = `
+    <div class="attendees-dropdown-header">
+      <h3>Attendees</h3>
+    </div>
+    <div class="attendees-dropdown-list">
+      ${attendeesListHtml}
+    </div>
+  `;
+
+  document.body.appendChild(dropdown);
+
+  // Position the dropdown
+  const rect = triggerElement.getBoundingClientRect();
+  dropdown.style.top = `${rect.bottom + 8}px`;
+  dropdown.style.left = `${rect.left}px`;
+
+  // Add email copy handlers
+  dropdown.querySelectorAll('.attendee-action-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const email = btn.dataset.email;
+      if (email) {
+        await navigator.clipboard.writeText(email);
+        // Show visual feedback
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.classList.remove('copied');
+        }, 1500);
+      }
+    });
+  });
+
+  // Close dropdown when clicking outside
+  setTimeout(() => {
+    document.addEventListener('click', function closeDropdown(e) {
+      if (!dropdown.contains(e.target) && !triggerElement.contains(e.target)) {
+        dropdown.remove();
+        document.removeEventListener('click', closeDropdown);
+      }
+    });
+  }, 0);
+}
 
 // Function to create meeting card elements
 // Create upcoming meeting card (for Coming up section)
@@ -781,6 +970,60 @@ function createUpcomingMeetingCard(meeting) {
   const monthStr = meetingDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
   const dayNum = meetingDate.getDate();
 
+  // Get attendees info - filter out the logged-in user
+  const allAttendees = meeting.attendees || [];
+  const attendees = allAttendees.filter(attendee => !attendee.isSelf);
+  const totalAttendees = attendees.length;
+
+  // Get first attendee for display
+  let attendeesHtml = '';
+  if (totalAttendees > 0) {
+    const firstAttendee = attendees[0];
+    const attendeeName = firstAttendee.name || firstAttendee.email?.split('@')[0] || 'User';
+    const additionalCount = totalAttendees - 1;
+
+    // Get status indicator
+    let statusIndicator = '';
+    if (firstAttendee.status === 'STATUS_ACCEPTED') {
+      statusIndicator = `
+        <div class="status-indicator status-accepted" title="Accepted">
+          <svg width="8" height="8" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M6 11.5L2.5 8L3.91 6.59L6 8.67L12.09 2.59L13.5 4L6 11.5Z" fill="#0F9D58"/>
+          </svg>
+        </div>
+      `;
+    } else if (firstAttendee.status === 'STATUS_DECLINED') {
+      statusIndicator = `
+        <div class="status-indicator status-declined" title="Declined">
+          <svg width="8" height="8" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12.59 4L8 8.59L3.41 4L2 5.41L6.59 10L2 14.59L3.41 16L8 11.41L12.59 16L14 14.59L9.41 10L14 5.41L12.59 4Z" fill="#DB4437"/>
+          </svg>
+        </div>
+      `;
+    } else if (firstAttendee.status === 'STATUS_TENTATIVE') {
+      statusIndicator = `
+        <div class="status-indicator status-tentative" title="Tentative">
+          <svg width="8" height="8" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M7 11H9V13H7V11ZM8 2C4.69 2 2 4.69 2 8C2 11.31 4.69 14 8 14C11.31 14 14 11.31 14 8C14 4.69 11.31 2 8 2ZM8 12.4C5.57 12.4 3.6 10.43 3.6 8C3.6 5.57 5.57 3.6 8 3.6C10.43 3.6 12.4 5.57 12.4 8C12.4 10.43 10.43 12.4 8 12.4ZM8 5C6.9 5 6 5.9 6 7H7.2C7.2 6.56 7.56 6.2 8 6.2C8.44 6.2 8.8 6.56 8.8 7C8.8 8.2 7 8.05 7 10H8.2C8.2 8.75 10 8.6 10 7C10 5.9 9.1 5 8 5Z" fill="#F4B400"/>
+          </svg>
+        </div>
+      `;
+    }
+
+    attendeesHtml = `
+      <div class="meeting-attendees" data-meeting-id="${meeting.id}">
+        <div class="attendee-avatar">
+          ${firstAttendee.photo_url ?
+            `<img src="${firstAttendee.photo_url}" alt="${attendeeName}" />` :
+            `<div class="avatar-placeholder">${attendeeName.charAt(0).toUpperCase()}</div>`
+          }
+          ${statusIndicator}
+        </div>
+        <span class="attendee-text">${attendeeName}${additionalCount > 0 ? ` +${additionalCount}` : ''}</span>
+      </div>
+    `;
+  }
+
   card.innerHTML = `
     <div class="date-badge">
       <div class="date-month">${monthStr}</div>
@@ -788,7 +1031,10 @@ function createUpcomingMeetingCard(meeting) {
     </div>
     <div class="upcoming-meeting-content">
       <div class="upcoming-meeting-title">${meeting.title || 'Untitled Meeting'}</div>
-      <div class="upcoming-meeting-time">${dayStr} ${timeStr}</div>
+      <div class="upcoming-meeting-meta">
+        <div class="upcoming-meeting-time">${dayStr} ${timeStr}</div>
+        ${attendeesHtml}
+      </div>
     </div>
   `;
 
@@ -824,6 +1070,13 @@ function createUpcomingMeetingCard(meeting) {
 
       // Save to file
       await window.electronAPI.saveMeetingsData(meetingsData);
+    } else {
+      // Update existing note with latest calendar data (including attendees)
+      existingNote.attendees = meeting.attendees || existingNote.attendees || [];
+      existingNote.startTime = meeting.startTime || existingNote.startTime;
+      existingNote.endTime = meeting.endTime || existingNote.endTime;
+      existingNote.location = meeting.location || existingNote.location;
+      existingNote.videoMeetingUrl = meeting.videoMeetingUrl || existingNote.videoMeetingUrl;
     }
 
     // Open the note (either existing or newly created)
@@ -1162,6 +1415,71 @@ function showEditorView(meetingId, isFutureMeeting = false) {
   const dateObj = new Date(meeting.date);
   document.getElementById('noteDate').textContent = formatDate(dateObj);
 
+  // Set up participants display - filter out the logged-in user
+  const participantsElement = document.getElementById('noteParticipants');
+  const allAttendees = meeting.attendees || [];
+  const attendees = allAttendees.filter(attendee => !attendee.isSelf);
+
+  if (attendees.length > 0) {
+    const firstAttendee = attendees[0];
+    const attendeeName = firstAttendee.name || firstAttendee.email?.split('@')[0] || 'User';
+    const additionalCount = attendees.length - 1;
+
+    // Get status indicator
+    let statusIndicator = '';
+    if (firstAttendee.status === 'STATUS_ACCEPTED') {
+      statusIndicator = `
+        <div class="status-indicator status-accepted" title="Accepted">
+          <svg width="8" height="8" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M6 11.5L2.5 8L3.91 6.59L6 8.67L12.09 2.59L13.5 4L6 11.5Z" fill="#0F9D58"/>
+          </svg>
+        </div>
+      `;
+    } else if (firstAttendee.status === 'STATUS_DECLINED') {
+      statusIndicator = `
+        <div class="status-indicator status-declined" title="Declined">
+          <svg width="8" height="8" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12.59 4L8 8.59L3.41 4L2 5.41L6.59 10L2 14.59L3.41 16L8 11.41L12.59 16L14 14.59L9.41 10L14 5.41L12.59 4Z" fill="#DB4437"/>
+          </svg>
+        </div>
+      `;
+    } else if (firstAttendee.status === 'STATUS_TENTATIVE') {
+      statusIndicator = `
+        <div class="status-indicator status-tentative" title="Tentative">
+          <svg width="8" height="8" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M7 11H9V13H7V11ZM8 2C4.69 2 2 4.69 2 8C2 11.31 4.69 14 8 14C11.31 14 14 11.31 14 8C14 4.69 11.31 2 8 2ZM8 12.4C5.57 12.4 3.6 10.43 3.6 8C3.6 5.57 5.57 3.6 8 3.6C10.43 3.6 12.4 5.57 12.4 8C12.4 10.43 10.43 12.4 8 12.4ZM8 5C6.9 5 6 5.9 6 7H7.2C7.2 6.56 7.56 6.2 8 6.2C8.44 6.2 8.8 6.56 8.8 7C8.8 8.2 7 8.05 7 10H8.2C8.2 8.75 10 8.6 10 7C10 5.9 9.1 5 8 5Z" fill="#F4B400"/>
+          </svg>
+        </div>
+      `;
+    }
+
+    participantsElement.innerHTML = `
+      <div class="attendee-avatar">
+        ${firstAttendee.photo_url ?
+          `<img src="${firstAttendee.photo_url}" alt="${attendeeName}" />` :
+          `<div class="avatar-placeholder">${attendeeName.charAt(0).toUpperCase()}</div>`
+        }
+        ${statusIndicator}
+      </div>
+      <span class="attendee-text">${attendeeName}${additionalCount > 0 ? ` +${additionalCount}` : ''}</span>
+    `;
+    participantsElement.style.display = 'flex';
+
+    // Remove any existing click handlers by cloning the element
+    const newParticipantsElement = participantsElement.cloneNode(true);
+    participantsElement.parentNode.replaceChild(newParticipantsElement, participantsElement);
+
+    // Add click handler to show dropdown
+    newParticipantsElement.style.cursor = 'pointer';
+    newParticipantsElement.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showAttendeesDropdown(meeting, newParticipantsElement);
+    });
+  } else {
+    // No participants data - hide participants element
+    participantsElement.style.display = 'none';
+  }
+
   // Support both legacy and new tabbed editor
   const legacyEditorElement = document.getElementById('simple-editor');
   const personalNotesElement = document.getElementById('personal-notes-editor');
@@ -1199,8 +1517,6 @@ function showEditorView(meetingId, isFutureMeeting = false) {
         console.log(`Loaded AI summary for meeting: ${meetingId}, length: ${meeting.aiSummary.length} characters`);
       }
 
-      // Update summary button state
-      updateSummaryButtonState(meeting.aiSummary && meeting.aiSummary.trim().length > 0);
 
       // Load meeting video if available
       loadMeetingVideo(meeting);
@@ -1648,7 +1964,7 @@ function renderMeetings() {
     });
 
     let showingAll = false;
-    const hasMoreMeetings = weekMeetings.length > todayMeetings.length;
+    const hasMoreMeetings = weekMeetings.length > 4;
 
     upcomingSection.innerHTML = `
       <div class="section-header">
@@ -1669,11 +1985,11 @@ function renderMeetings() {
       });
     };
 
-    // Initially show today's meetings (or first 3 of week if no meetings today)
-    renderUpcomingMeetings(todayMeetings.length > 0 ? todayMeetings : weekMeetings.slice(0, 3));
+    // Initially show first 4 meetings
+    renderUpcomingMeetings(weekMeetings.slice(0, 4));
 
     // Handle show more button
-    if (hasMoreMeetings) {
+    if (weekMeetings.length > 4) {
       const showMoreBtn = document.getElementById('showMoreUpcoming');
       showMoreBtn.addEventListener('click', () => {
         showingAll = !showingAll;
@@ -1681,7 +1997,7 @@ function renderMeetings() {
           renderUpcomingMeetings(weekMeetings);
           showMoreBtn.textContent = 'Show less';
         } else {
-          renderUpcomingMeetings(todayMeetings.length > 0 ? todayMeetings : weekMeetings.slice(0, 3));
+          renderUpcomingMeetings(weekMeetings.slice(0, 4));
           showMoreBtn.textContent = 'Show more';
         }
       });
@@ -2520,82 +2836,10 @@ function initTabbedEditor() {
     });
   });
 
-  // Initialize summary button behavior
-  initSummaryButton();
-
   // Initialize video section
   initVideoSection();
 }
 
-// Track if summary button is already initialized
-let summaryButtonInitialized = false;
-
-// Initialize context-aware summary button
-function initSummaryButton() {
-  // Only initialize once
-  if (summaryButtonInitialized) return;
-
-  const generateBtn = document.getElementById('generateBtn');
-
-  if (!generateBtn) return;
-
-  // Handle generate button click
-  generateBtn.addEventListener('click', async (e) => {
-    const state = generateBtn.getAttribute('data-state');
-
-    if (state === 'has-summary') {
-      // If summary exists, just switch to summary tab (same as clicking summary tab button)
-      const summaryTabBtn = document.querySelector('.tab-btn[data-tab="ai-summary"]');
-      if (summaryTabBtn) summaryTabBtn.click();
-    } else {
-      // Generate summary
-      if (currentEditingMeetingId) {
-        try {
-          console.log('Starting summary generation for meeting:', currentEditingMeetingId);
-
-          // Update button state to show loading
-          generateBtn.disabled = true;
-          const btnText = generateBtn.querySelector('.btn-text');
-          if (btnText) btnText.textContent = 'Generating...';
-
-          // Check if the API method exists
-          if (!window.electronAPI || !window.electronAPI.generateMeetingSummaryStreaming) {
-            throw new Error('Summary generation API not available');
-          }
-
-          const result = await window.electronAPI.generateMeetingSummaryStreaming(currentEditingMeetingId);
-          console.log('Summary generation result:', result);
-
-          if (result && !result.success) {
-            throw new Error(result.error || 'Failed to generate summary');
-          }
-        } catch (error) {
-          console.error('Error generating summary:', error);
-          alert('Error generating summary: ' + (error.message || error));
-        } finally {
-          // Reset button state
-          generateBtn.disabled = false;
-          const btnText = generateBtn.querySelector('.btn-text');
-          if (btnText) btnText.textContent = 'Summarize';
-        }
-      }
-    }
-  });
-
-  summaryButtonInitialized = true;
-}
-
-// Update summary button state based on whether summary exists
-function updateSummaryButtonState(hasSummary) {
-  const generateBtn = document.getElementById('generateBtn');
-  if (!generateBtn) return;
-
-  if (hasSummary) {
-    generateBtn.setAttribute('data-state', 'has-summary');
-  } else {
-    generateBtn.setAttribute('data-state', 'initial');
-  }
-}
 
 // Initialize sidebar functionality
 function initMeetingSidebar() {
@@ -2886,6 +3130,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Listen for recording completed events
   window.electronAPI.onRecordingCompleted((meetingId) => {
     console.log('Recording completed for meeting:', meetingId);
+
     // If this note is currently being edited, reload its content
     if (currentEditingMeetingId === meetingId) {
       loadMeetingsDataFromFile().then(() => {
@@ -2901,6 +3146,54 @@ document.addEventListener('DOMContentLoaded', async () => {
           // Update AI summary if available
           const aiSummaryEditor = document.getElementById('ai-summary-editor');
           if (aiSummaryEditor && meeting.aiSummary) {
+            aiSummaryEditor.value = meeting.aiSummary;
+          }
+
+          // Note: Tab switch and spinner are already handled by the stop button handler
+          // Backend triggers summarization automatically
+        }
+      });
+    }
+  });
+
+  // Listen for summary streaming updates from backend
+  window.electronAPI.onSummaryUpdate((data) => {
+    console.log('Summary update received for meeting:', data.meetingId);
+
+    // Only update if this is the currently edited meeting
+    if (currentEditingMeetingId === data.meetingId) {
+      const aiSummaryEditor = document.getElementById('ai-summary-editor');
+      if (aiSummaryEditor) {
+        aiSummaryEditor.value = data.aiSummary;
+      }
+    }
+  });
+
+  // Listen for summary generation completion
+  window.electronAPI.onSummaryGenerated((meetingId) => {
+    console.log('🔥 onSummaryGenerated EVENT FIRED for meeting:', meetingId);
+
+    // Remove spinner from record button
+    window.setRecordButtonLoading(false);
+
+    // Expand sidebar when summary is generated - just click the toggle button if sidebar is hidden
+    const meetingSidebar = document.getElementById('meetingSidebar');
+    const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
+
+    if (meetingSidebar && sidebarToggleBtn && meetingSidebar.classList.contains('collapsed')) {
+      console.log('✅ Clicking sidebar toggle to expand');
+      sidebarToggleBtn.click();
+    }
+
+    // Only update meeting data if this is the currently edited meeting
+    if (currentEditingMeetingId === meetingId) {
+
+      // Reload the meeting data to get the final summary
+      loadMeetingsDataFromFile().then(() => {
+        const meeting = [...upcomingMeetings, ...pastMeetings].find(m => m.id === meetingId);
+        if (meeting && meeting.aiSummary) {
+          const aiSummaryEditor = document.getElementById('ai-summary-editor');
+          if (aiSummaryEditor) {
             aiSummaryEditor.value = meeting.aiSummary;
           }
         }
@@ -3030,6 +3323,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // If this note is currently being edited, refresh the content
     if (currentEditingMeetingId === meetingId) {
+      // Expand sidebar when summary is generated
+      const sidebar = document.getElementById('sidebar');
+      const editorContent = document.querySelector('.editor-content');
+      const chatInputContainer = document.querySelector('.chat-input-container');
+      console.log('Sidebar expansion check (onSummaryGenerated 2):', {
+        sidebar: !!sidebar,
+        editorContent: !!editorContent,
+        chatInputContainer: !!chatInputContainer,
+        isHidden: sidebar?.classList.contains('hidden')
+      });
+      if (sidebar && sidebar.classList.contains('hidden')) {
+        console.log('Expanding sidebar after summary generation');
+        sidebar.classList.remove('hidden');
+        if (editorContent) editorContent.classList.remove('full-width');
+        if (chatInputContainer) chatInputContainer.style.display = 'block';
+      }
+
       loadMeetingsDataFromFile().then(() => {
         const meeting = [...upcomingMeetings, ...pastMeetings].find(m => m.id === meetingId);
         if (meeting) {
@@ -3037,9 +3347,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           const aiSummaryEditor = document.getElementById('ai-summary-editor');
           if (aiSummaryEditor && meeting.aiSummary) {
             aiSummaryEditor.value = meeting.aiSummary;
-
-            // Update summary button state
-            updateSummaryButtonState(true);
 
             // Switch to summary tab to show the result
             const summaryTab = document.querySelector('.tab-btn[data-tab="ai-summary"]');
@@ -3054,7 +3361,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Listen for streaming summary updates
   window.electronAPI.onSummaryUpdate((data) => {
-    const { meetingId, content, aiSummary } = data;
+    const { meetingId, content, aiSummary, completed } = data;
 
     // If this note is currently being edited, update the content immediately
     if (currentEditingMeetingId === meetingId) {
@@ -3079,6 +3386,33 @@ document.addEventListener('DOMContentLoaded', async () => {
           legacyEditor.scrollTop = legacyEditor.scrollHeight;
         }
       });
+
+      // If this is the final update, expand the sidebar
+      if (completed) {
+        console.log('✅ Summary generation completed, expanding sidebar');
+        const sidebar = document.getElementById('sidebar');
+        const editorContent = document.querySelector('.editor-content');
+        const chatInputContainer = document.querySelector('.chat-input-container');
+        console.log('Sidebar elements found:', {
+          sidebar: !!sidebar,
+          editorContent: !!editorContent,
+          chatInputContainer: !!chatInputContainer,
+          isHidden: sidebar?.classList.contains('hidden'),
+          sidebarClasses: sidebar ? Array.from(sidebar.classList) : null
+        });
+        if (sidebar && sidebar.classList.contains('hidden')) {
+          console.log('🔧 Expanding sidebar NOW');
+          sidebar.classList.remove('hidden');
+          if (editorContent) editorContent.classList.remove('full-width');
+          if (chatInputContainer) chatInputContainer.style.display = 'block';
+          console.log('✅ Sidebar expanded');
+        } else {
+          console.log('⚠️ Sidebar NOT hidden or not found:', {
+            exists: !!sidebar,
+            isHidden: sidebar?.classList.contains('hidden')
+          });
+        }
+      }
     }
   });
 
@@ -3448,16 +3782,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (window.currentRecordingId) {
           try {
             console.log('Stopping manual recording:', window.currentRecordingId);
-            recordButton.disabled = true; // Temporarily disable
+
+            // Store the recording ID before stopping so it's available for the completion event
+            window.lastRecordingId = window.currentRecordingId;
+
+            // Update recording state immediately
+            window.isRecording = false;
+            recordButton.classList.remove('recording');
+
+            // Switch to AI summary tab immediately
+            const summaryTabBtn = document.querySelector('.tab-btn[data-tab="ai-summary"]');
+            if (summaryTabBtn) summaryTabBtn.click();
+
+            // Set loading state
+            window.setRecordButtonLoading(true);
 
             // Call the API to stop recording
-            const result = await window.electronAPI.stopManualRecording(window.currentRecordingId);
-
-            // Change to record mode
-            recordButton.classList.remove('recording');
-            recordIcon.style.display = 'block';
-            stopIcon.style.display = 'none';
-            recordButton.disabled = false;
+            const result = await window.electronAPI.generateSummary(window.currentRecordingId);
 
             if (result.success) {
               console.log('Manual recording stopped successfully');
@@ -3482,6 +3823,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else {
               console.error('Failed to stop recording:', result.error);
               alert('Failed to stop recording: ' + result.error);
+
+              // Restore recording state if failed
+              window.isRecording = true;
+              recordButton.classList.add('recording');
+
+              // Reset button states
+              window.setRecordButtonLoading(false);
             }
 
             // Reset recording ID
@@ -3489,7 +3837,13 @@ document.addEventListener('DOMContentLoaded', async () => {
           } catch (error) {
             console.error('Error stopping recording:', error);
             alert('Error stopping recording: ' + (error.message || error));
-            recordButton.disabled = false;
+
+            // Restore recording state on error
+            window.isRecording = true;
+            recordButton.classList.add('recording');
+
+            // Reset button states
+            window.setRecordButtonLoading(false);
           }
         } else {
           console.warn('No active recording ID found');
@@ -3502,50 +3856,69 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // Handle generate notes button (Auto button)
-  const generateButton = document.querySelector('.generate-btn');
-  if (generateButton) {
-    generateButton.addEventListener('click', async () => {
-      console.log('Generating AI summary from transcript...');
+  // Setup summarize button
+  const generateBtn = document.getElementById('generateBtn');
+  console.log('Setting up summarize button, element found:', !!generateBtn);
+  if (generateBtn) {
+    let isGeneratingSummary = false;
+    generateBtn.addEventListener('click', async () => {
+      console.log('SUMMARIZE BUTTON CLICKED - disabled:', generateBtn.disabled, 'meetingId:', currentEditingMeetingId);
 
-      // Check if we have an active meeting
-      if (!currentEditingMeetingId) {
-        alert('No meeting is currently open');
+      // Prevent concurrent summary generation
+      if (isGeneratingSummary) {
+        console.log('Summary generation already in progress, ignoring click');
         return;
       }
 
-      // Store the original HTML content (including the sparkle icon)
-      const originalHTML = generateButton.innerHTML;
+      if (!currentEditingMeetingId) {
+        console.log('No currentEditingMeetingId, returning');
+        return;
+      }
 
-      // Show loading state - but keep the same structure
-      generateButton.innerHTML = `
-        <svg width="16" height="16" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 4px;">
-          <path d="M208,512a24.84,24.84,0,0,1-23.34-16l-39.84-103.6a16.06,16.06,0,0,0-9.19-9.19L32,343.34a25,25,0,0,1,0-46.68l103.6-39.84a16.06,16.06,0,0,0,9.19-9.19L184.66,144a25,25,0,0,1,46.68,0l39.84,103.6a16.06,16.06,0,0,0,9.19,9.19l103,39.63A25.49,25.49,0,0,1,400,320.52a24.82,24.82,0,0,1-16,22.82l-103.6,39.84a16.06,16.06,0,0,0-9.19,9.19L231.34,496A24.84,24.84,0,0,1,208,512Z" fill="currentColor"/>
-          <path d="M88,176a14.67,14.67,0,0,1-13.69-9.4L57.45,122.76a7.28,7.28,0,0,0-4.21-4.21L9.4,101.69a14.67,14.67,0,0,1,0-27.38L53.24,57.45a7.31,7.31,0,0,0,4.21-4.21L74.16,9.79A15,15,0,0,1,86.23.11,14.67,14.67,0,0,1,101.69,9.4l16.86,43.84a7.31,7.31,0,0,0,4.21,4.21L166.6,74.31a14.67,14.67,0,0,1,0,27.38l-43.84,16.86a7.28,7.28,0,0,0-4.21,4.21L101.69,166.6A14.67,14.67,0,0,1,88,176Z" fill="currentColor"/>
-          <path d="M400,256a16,16,0,0,1-14.93-10.26l-22.84-59.37a8,8,0,0,0-4.6-4.6l-59.37-22.84a16,16,0,0,1,0-29.86l59.37-22.84a8,8,0,0,0,4.6-4.6L384.9,42.68a16.45,16.45,0,0,1,13.17-10.57,16,16,0,0,1,16.86,10.15l22.84,59.37a8,8,0,0,0,4.6,4.6l59.37,22.84a16,16,0,0,1,0,29.86l-59.37,22.84a8,8,0,0,0-4.6,4.6l-22.84,59.37A16,16,0,0,1,400,256Z" fill="currentColor"/>
-        </svg>
-        Generating...
-      `;
-      generateButton.disabled = true;
+      isGeneratingSummary = true;
 
       try {
-        // Use streaming version for better user experience
-        console.log('Starting streaming summary generation');
+        console.log('Getting recording ID from meeting object for:', currentEditingMeetingId);
 
-        // Log the Auto button summary generation to the SDK logger
-        sdkLogger.log('Auto button: Requesting AI summary generation for meeting: ' + currentEditingMeetingId);
+        // Get recordingId from the meeting object (works for both active and completed recordings)
+        const meeting = [...upcomingMeetings, ...pastMeetings].find(m => m.id === currentEditingMeetingId);
+        console.log('Found meeting:', meeting);
 
-        const result = await window.electronAPI.generateMeetingSummaryStreaming(currentEditingMeetingId);
+        if (!meeting || !meeting.recordingId) {
+          console.log('No recordingId found for this meeting');
+          alert('No recording found for this meeting. Please start a recording first.');
+          isGeneratingSummary = false;
+          return;
+        }
+
+        const recordingId = meeting.recordingId;
+        console.log('Using stored recordingId from meeting:', recordingId);
+
+        // EXACT same code as stop recording button
+        window.lastRecordingId = recordingId;
+        window.isRecording = false;
+        recordButton.classList.remove('recording');
+
+        const summaryTabBtn = document.querySelector('.tab-btn[data-tab="ai-summary"]');
+        console.log('Switching to AI summary tab');
+        if (summaryTabBtn) summaryTabBtn.click();
+
+        console.log('Calling setRecordButtonLoading(true), function exists:', typeof window.setRecordButtonLoading);
+        window.setRecordButtonLoading(true);
+        console.log('setRecordButtonLoading(true) completed');
+
+        console.log('Calling generateSummary API');
+        const result = await window.electronAPI.generateSummary(recordingId);
+        console.log('generateSummary result:', result);
 
         if (result.success) {
-          console.log('Summary generated successfully (streaming)');
-          // Show a little toast message
+          console.log('Manual recording stopped successfully');
+
           const toast = document.createElement('div');
           toast.className = 'toast';
-          toast.textContent = 'Summary generated successfully!';
+          toast.textContent = 'Recording stopped. Generating summary...';
           document.body.appendChild(toast);
 
-          // Remove toast after 3 seconds
           setTimeout(() => {
             toast.style.opacity = '0';
             setTimeout(() => {
@@ -3553,37 +3926,27 @@ document.addEventListener('DOMContentLoaded', async () => {
             }, 300);
           }, 3000);
         } else {
-          console.error('Failed to generate summary:', result.error);
-          alert('Failed to generate summary: ' + result.error);
+          console.error('Failed to stop recording:', result.error);
+          alert('Failed to stop recording: ' + result.error);
+          window.isRecording = true;
+          recordButton.classList.add('recording');
+          window.setRecordButtonLoading(false);
         }
+
+        window.currentRecordingId = null;
       } catch (error) {
-        console.error('Error generating summary:', error);
-        alert('Error generating summary: ' + (error.message || error));
+        console.error('Error stopping recording:', error);
+        alert('Error stopping recording: ' + (error.message || error));
+        window.isRecording = true;
+        recordButton.classList.add('recording');
+        window.setRecordButtonLoading(false);
       } finally {
-        // Reset button state with the original HTML (including sparkle icon)
-        generateButton.innerHTML = originalHTML;
-        generateButton.disabled = false;
+        isGeneratingSummary = false;
       }
     });
   }
 
-
-
-  // Listen for recording completed events
-  window.electronAPI.onRecordingCompleted((meetingId) => {
-    console.log('Recording completed for meeting:', meetingId);
-    if (currentEditingMeetingId === meetingId) {
-      // Reload the meeting data first
-      loadMeetingsDataFromFile().then(() => {
-        // Refresh the editor with the updated content
-        const meeting = [...upcomingMeetings, ...pastMeetings].find(m => m.id === meetingId);
-        const simpleEditor = document.getElementById('simple-editor');
-        if (meeting && simpleEditor) {
-          simpleEditor.value = meeting.content;
-        }
-      });
-    }
-  });
+  // Note: Removed duplicate .generate-btn listener to avoid double execution
 
   // Check authentication status and display user info (make it global)
   window.updateAuthStatus = async function() {
