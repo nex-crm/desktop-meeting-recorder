@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onSummaryGenerated: (callback) => ipcRenderer.on('summary-generated', (_, meetingId) => callback(meetingId)),
   onSummaryUpdate: (callback) => ipcRenderer.on('summary-update', (_, data) => callback(data)),
   onRecordingStateChange: (callback) => ipcRenderer.on('recording-state-change', (_, data) => callback(data)),
+  onVideoUrlUpdated: (callback) => ipcRenderer.on('video-url-updated', (_, data) => callback(data)),
   onParticipantsUpdated: (callback) => ipcRenderer.on('participants-updated', (_, meetingId) => callback(meetingId)),
   onVideoFrame: (callback) => ipcRenderer.on('video-frame', (_, data) => callback(data)),
   onMeetingDetectionStatus: (callback) => ipcRenderer.on('meeting-detection-status', (_, data) => callback(data)),
@@ -56,6 +57,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Calendar APIs
   calendar: {
     getUpcomingMeetings: (hours) => ipcRenderer.invoke('calendar:getUpcomingMeetings', hours),
+    getPastMeetings: (days) => ipcRenderer.invoke('calendar:getPastMeetings', days),
     getMeetingDetails: (eventId) => ipcRenderer.invoke('calendar:getMeetingDetails', eventId),
     onCalendarSynced: (callback) => ipcRenderer.on('calendar:synced', (_, meetings) => callback(meetings)),
     onMeetingStarting: (callback) => ipcRenderer.on('meeting:starting', (_, meeting) => callback(meeting)),

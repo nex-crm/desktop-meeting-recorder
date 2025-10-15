@@ -113,6 +113,106 @@ class NexApiService {
     }
   }
 
+  async getPastMeetings(days = 7) {
+    try {
+      const workspaceSlug = this.authService.storage.getWorkspaceSlug();
+
+      if (!workspaceSlug) {
+        console.warn('No workspace slug available, cannot fetch meetings');
+        return { meetings: [] };
+      }
+
+      const now = new Date();
+      // Get meetings from the past X days up to now
+      const from = new Date(now.getTime() - (days * 24 * 60 * 60 * 1000));
+      const to = now;
+
+      const requestBody = {
+        from_time: from.toISOString(),
+        to_time: to.toISOString(),
+        limit: 50,
+        sort_order: 'SORT_ORDER_DESC' // Most recent first
+      };
+
+      console.log(`Fetching past meetings from ${requestBody.from_time} to ${requestBody.to_time}`);
+
+      const response = await this.client.post(`/v1/workspaces/${workspaceSlug}/meetings`, requestBody);
+
+      // Extract meetings from response
+      const apiMeetings = response.data?.meetings || response.data?.data?.meetings || [];
+
+      console.log(`Fetched ${apiMeetings.length} past meetings from List API, enriching with participant data...`);
+
+      // Enrich each meeting with participant data from Get Meeting API
+      const enrichedMeetings = await Promise.all(
+        apiMeetings.map(async (meeting) => {
+          try {
+            const detailsResponse = await this.client.get(`/v1/workspaces/${workspaceSlug}/meetings/${meeting.id}`);
+            const meetingDetails = detailsResponse.data?.meeting || detailsResponse.data;
+
+            // Transform participants to attendees format
+            const attendees = (meetingDetails.participants || []).map(participant => ({
+              email: participant.email,
+              name: participant.name || participant.email?.split('@')[0],
+              status: participant.status,
+              isOrganizer: participant.isOrganizer || false,
+              isSelf: participant.isSelf || false,
+              entityId: participant.entityId,
+              photo_url: participant.photo_url || participant.photoUrl,
+              title: participant.title || participant.role
+            }));
+
+            return {
+              id: meeting.id,
+              title: meeting.title || 'Untitled Meeting',
+              startTime: meeting.startTime,
+              endTime: meeting.endTime,
+              date: meeting.startTime,
+              description: meeting.description,
+              videoMeetingUrl: meeting.videoMeeting?.url,
+              videoMeetingType: meeting.videoMeeting?.type,
+              attendees,
+              calendarEventId: meeting.calendar_event_id || meeting.calendarEventId
+            };
+          } catch (error) {
+            console.error(`Failed to fetch details for meeting ${meeting.id}:`, error);
+            // Return basic meeting info without participants on error
+            return {
+              id: meeting.id,
+              title: meeting.title || 'Untitled Meeting',
+              startTime: meeting.startTime,
+              endTime: meeting.endTime,
+              date: meeting.startTime,
+              description: meeting.description,
+              videoMeetingUrl: meeting.videoMeeting?.url,
+              attendees: [],
+              calendarEventId: meeting.calendar_event_id || meeting.calendarEventId
+            };
+          }
+        })
+      );
+
+      console.log(`Enriched ${enrichedMeetings.length} past meetings with participant data`);
+
+      // Filter to only include meetings that have already ended
+      const pastMeetings = enrichedMeetings.filter(meeting => {
+        const endTime = new Date(meeting.endTime);
+        return endTime < now;
+      });
+
+      console.log(`Filtered to ${pastMeetings.length} past meetings (${enrichedMeetings.length - pastMeetings.length} excluded)`);
+
+      return {
+        meetings: pastMeetings
+      };
+    } catch (error) {
+      console.error('Failed to fetch past meetings from API:', error);
+
+      // Return empty array on error rather than failing completely
+      return { meetings: [] };
+    }
+  }
+
   async getMeetingDetails(meetingId) {
     try {
       const workspaceSlug = this.authService.storage.getWorkspaceSlug();

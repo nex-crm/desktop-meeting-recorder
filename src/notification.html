@@ -167,25 +167,27 @@
   </div>
 
   <script>
+    const { ipcRenderer } = require('electron');
+
     // Handle close button
     document.getElementById('closeBtn').addEventListener('click', () => {
-      window.electronAPI.closeNotification();
+      ipcRenderer.send('close-notification');
     });
 
     // Handle dismiss button
     document.getElementById('dismissBtn').addEventListener('click', () => {
-      window.electronAPI.closeNotification();
+      ipcRenderer.send('close-notification');
     });
 
     // Handle action button
     document.getElementById('actionBtn').addEventListener('click', () => {
-      window.electronAPI.sendNotificationAction('start-recording');
-      window.electronAPI.closeNotification();
+      ipcRenderer.send('notification-action', 'start-recording');
+      ipcRenderer.send('close-notification');
     });
 
     // Auto-close after 10 seconds
     setTimeout(() => {
-      window.electronAPI.closeNotification();
+      ipcRenderer.send('close-notification');
     }, 10000);
   </script>
 </body>

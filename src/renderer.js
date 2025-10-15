@@ -1620,8 +1620,25 @@ function showEditorView(meetingId, isFutureMeeting = false) {
           }
         }
 
-        // Check if this note has an active recording and update the record button
-        checkActiveRecordingState();
+        // Check if meeting is older than 4 hours
+        const endTime = meeting.endTime ? new Date(meeting.endTime) : new Date(meeting.startTime || meeting.date);
+        const now = new Date();
+        const hoursSinceEnd = (now - endTime) / (1000 * 60 * 60);
+
+        const recordButton = document.getElementById('recordButton');
+        if (hoursSinceEnd > 4) {
+          // Meeting ended more than 4 hours ago - hide record button, keep summarize button
+          if (recordButton) {
+            recordButton.style.display = 'none';
+          }
+        } else {
+          // Meeting ended less than 4 hours ago - show record button
+          if (recordButton) {
+            recordButton.style.display = 'flex';
+          }
+          // Check if this note has an active recording and update the record button
+          checkActiveRecordingState();
+        }
       }
     } else {
       // No start time, treat as regular note
@@ -1883,6 +1900,7 @@ async function createNewMeeting() {
             const stopIcon = recordButton.querySelector('.stop-icon');
 
             recordButton.classList.add('recording');
+            recordButton.disabled = false; // Ensure button is enabled so user can stop recording
             recordIcon.style.display = 'none';
             stopIcon.style.display = 'block';
           }
@@ -1924,6 +1942,59 @@ async function fetchCalendarMeetings() {
   } catch (error) {
     console.error('Failed to fetch calendar meetings:', error);
     calendarMeetings = [];
+  }
+}
+
+// Fetch past meetings from API for notes section
+async function fetchPastMeetings() {
+  try {
+    const result = await window.electronAPI.calendar.getPastMeetings(7); // Past 7 days
+
+    if (result.success && result.meetings && Array.isArray(result.meetings)) {
+      result.meetings.forEach(meeting => {
+        // Check if note already exists
+        const existingNote = [...pastMeetings, ...upcomingMeetings].find(m =>
+          m.id === meeting.id || m.calendarEventId === meeting.id
+        );
+
+        if (!existingNote) {
+          // Create a new note for this past meeting
+          const newNote = {
+            id: `meeting_${Date.now()}_${meeting.id}`,
+            calendarEventId: meeting.id,
+            title: meeting.title || 'Untitled Meeting',
+            date: meeting.startTime || meeting.date,
+            startTime: meeting.startTime,
+            endTime: meeting.endTime,
+            type: 'calendar',
+            subtitle: meeting.organizerEmail || '',
+            content: '',
+            attendees: meeting.attendees || [],
+            location: meeting.location,
+            videoMeetingUrl: meeting.videoMeetingUrl,
+            isFuture: false
+          };
+
+          // Add to pastMeetings
+          pastMeetings.unshift(newNote);
+          meetingsData.pastMeetings.unshift(newNote);
+
+          // Update grouped meetings
+          const dateKey = formatDateHeader(newNote.date);
+          if (!pastMeetingsByDate[dateKey]) {
+            pastMeetingsByDate[dateKey] = [];
+          }
+          pastMeetingsByDate[dateKey].unshift(newNote);
+        }
+      });
+
+      // Save if we added any new past meetings
+      if (result.meetings.length > 0) {
+        await window.electronAPI.saveMeetingsData(meetingsData);
+      }
+    }
+  } catch (error) {
+    console.error('Failed to fetch past meetings:', error);
   }
 }
 
@@ -2033,15 +2104,73 @@ function renderMeetings() {
           </svg>
         `;
 
+        // Fetch latest calendar meetings
         await fetchCalendarMeetings();
+
+        // Get IDs of current calendar meetings from API
+        const currentCalendarIds = new Set(calendarMeetings.map(m => m.id));
+        console.log('Current calendar meeting IDs from API:', Array.from(currentCalendarIds));
+
+        // Remove calendar meetings from local storage that no longer exist in API
+        // Only remove calendar-type meetings that don't have content/notes
+        const calendarMeetingsToRemove = [];
+
+        upcomingMeetings.forEach((meeting, index) => {
+          // Check using calendarEventId since that's what matches the API
+          if (meeting.type === 'calendar' && meeting.calendarEventId && !currentCalendarIds.has(meeting.calendarEventId)) {
+            // Only remove if it doesn't have any content (transcript, notes, etc.)
+            if (!meeting.transcript?.length && !meeting.content && !meeting.personalNotes) {
+              console.log('Marking for removal from upcoming:', meeting.title, meeting.calendarEventId);
+              calendarMeetingsToRemove.push({ array: upcomingMeetings, index, meeting });
+            }
+          }
+        });
+
+        pastMeetings.forEach((meeting, index) => {
+          // Check using calendarEventId since that's what matches the API
+          if (meeting.type === 'calendar' && meeting.calendarEventId && !currentCalendarIds.has(meeting.calendarEventId)) {
+            // Only remove if it doesn't have any content (transcript, notes, etc.)
+            if (!meeting.transcript?.length && !meeting.content && !meeting.personalNotes) {
+              console.log('Marking for removal from past:', meeting.title, meeting.calendarEventId);
+              calendarMeetingsToRemove.push({ array: pastMeetings, index, meeting });
+            }
+          }
+        });
+
+        // Remove meetings from arrays (reverse order to maintain indices)
+        calendarMeetingsToRemove.reverse().forEach(({ array, index }) => {
+          array.splice(index, 1);
+        });
+
+        // Update meetingsData to reflect removals
+        meetingsData.upcomingMeetings = [...upcomingMeetings];
+        meetingsData.pastMeetings = [...pastMeetings];
+
+        // Save to file if we removed any meetings
+        if (calendarMeetingsToRemove.length > 0) {
+          await window.electronAPI.saveMeetingsData(meetingsData);
+          console.log(`Removed ${calendarMeetingsToRemove.length} obsolete calendar meetings`);
+        }
+
+        // Re-render meetings
         renderMeetings();
 
         const newMeetingsCount = calendarMeetings.length - previousMeetingsCount;
-        const message = newMeetingsCount > 0
-          ? `${newMeetingsCount} new meeting${newMeetingsCount > 1 ? 's' : ''} added`
-          : newMeetingsCount < 0
-          ? `${Math.abs(newMeetingsCount)} meeting${Math.abs(newMeetingsCount) > 1 ? 's' : ''} removed`
-          : 'Meetings are up to date';
+        const removedCount = calendarMeetingsToRemove.length;
+
+        let message = '';
+        if (newMeetingsCount > 0 && removedCount > 0) {
+          message = `${newMeetingsCount} new, ${removedCount} removed`;
+        } else if (newMeetingsCount > 0) {
+          message = `${newMeetingsCount} new meeting${newMeetingsCount > 1 ? 's' : ''}`;
+        } else if (removedCount > 0) {
+          message = `${removedCount} meeting${removedCount > 1 ? 's' : ''} removed`;
+        } else {
+          message = 'Up to date';
+        }
+
+        // Show toast notification
+        showToast(message, 'success');
 
         refreshBtn.innerHTML = `<span style="font-size: 11px;">${message}</span>`;
         refreshBtn.disabled = false;
@@ -2054,10 +2183,20 @@ function renderMeetings() {
     }
   }
 
-  // Group notes by date (excluding future meeting notes)
+  // Group notes by date (all past meetings, regardless of type)
   const notesByDate = {};
-  const allNotes = [...upcomingMeetings, ...pastMeetings]
-    .filter(meeting => meeting.type !== 'calendar' && !meeting.isFuture) // Exclude future meetings from notes
+  const now = new Date();
+  const allNotes = pastMeetings
+    .filter(meeting => {
+      // Calculate if meeting is in the future based on endTime or startTime
+      if (meeting.endTime) {
+        return new Date(meeting.endTime) <= now;
+      } else if (meeting.startTime) {
+        return new Date(meeting.startTime) <= now;
+      }
+      // If no time info, include it (legacy meetings or ad-hoc recordings)
+      return true;
+    })
     .sort((a, b) => new Date(b.date) - new Date(a.date));
 
   // Group meetings by date
@@ -2806,7 +2945,7 @@ function initVideoSection() {
 
 // Load video for meeting
 function loadMeetingVideo(meeting) {
-  console.log('loadMeetingVideo called for meeting:', meeting.id, 'videoPath:', meeting.videoPath);
+  console.log('loadMeetingVideo called for meeting:', meeting.id, 'videoPath:', meeting.videoPath, 'recallVideoUrl:', meeting.recallVideoUrl);
   const videoSection = document.getElementById('videoSection');
   const videoSource = document.getElementById('videoSource');
   const meetingVideo = document.getElementById('meetingVideo');
@@ -2817,12 +2956,37 @@ function loadMeetingVideo(meeting) {
     return;
   }
 
-  // Check if meeting has a recording (videoPath)
-  if (meeting.videoPath) {
+  // Check if meeting has a Recall video URL (prioritize this over local)
+  if (meeting.recallVideoUrl) {
     // Show video section
     videoSection.style.display = 'block';
 
-    console.log('Loading video from:', meeting.videoPath);
+    console.log('Loading video from Recall URL:', meeting.recallVideoUrl);
+
+    // Load video directly from Recall URL
+    videoSource.src = meeting.recallVideoUrl;
+    meetingVideo.load();
+
+    // Update duration when metadata loads
+    meetingVideo.addEventListener('loadedmetadata', () => {
+      const duration = meetingVideo.duration;
+      const minutes = Math.floor(duration / 60);
+      const seconds = Math.floor(duration % 60);
+      videoDuration.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }, { once: true });
+
+    // Handle video errors
+    meetingVideo.addEventListener('error', (e) => {
+      console.error('Video loading error:', e, meetingVideo.error);
+      videoSection.style.display = 'none';
+    }, { once: true });
+  }
+  // Fallback to local video path if no Recall URL
+  else if (meeting.videoPath) {
+    // Show video section
+    videoSection.style.display = 'block';
+
+    console.log('Loading video from local path:', meeting.videoPath);
 
     // Load video through IPC to get base64 data URL
     window.electronAPI.getVideoFile(meeting.videoPath).then(result => {
@@ -2981,6 +3145,8 @@ window.updateTranscriptButtons = function(hasTranscript) {
 
 // Toast notification helper
 function showToast(message, type = 'success') {
+  console.log('showToast called:', message, type);
+
   const existingToast = document.querySelector('.copy-toast');
   if (existingToast) {
     existingToast.remove();
@@ -2991,6 +3157,8 @@ function showToast(message, type = 'success') {
   toast.style.background = type === 'error' ? '#f44336' : '#4caf50';
   toast.textContent = message;
   document.body.appendChild(toast);
+
+  console.log('Toast element appended to body:', toast);
 
   setTimeout(() => {
     toast.remove();
@@ -3042,6 +3210,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Fetch calendar meetings
   await fetchCalendarMeetings();
 
+  // Fetch past meetings for notes section
+  await fetchPastMeetings();
+
   // Render meetings only after loading from file
   console.log('Data loaded, rendering meetings...');
   renderMeetings();
@@ -3059,6 +3230,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Fetch calendar meetings initially and every 5 minutes
   setInterval(() => {
     fetchCalendarMeetings();
+    fetchPastMeetings();
   }, 5 * 60 * 1000);
 
   // Track if we've shown notification for current meeting
@@ -3166,15 +3338,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Open the note (either existing or newly created)
     showEditorView(existingNote.id, true);
 
-    // Start recording immediately after a short delay to ensure editor is loaded
-    setTimeout(() => {
-      console.log('Starting recording for calendar meeting');
-      const recordButton = document.getElementById('recordButton');
-      if (recordButton && !window.isRecording) {
-        // Trigger the record button click to start recording
-        recordButton.click();
-      }
-    }, 500);
+    // Only start recording if this meeting doesn't already have a completed recording
+    if (!existingNote.recordingComplete && !existingNote.recordingId) {
+      // Start recording immediately after a short delay to ensure editor is loaded
+      setTimeout(() => {
+        console.log('Starting recording for calendar meeting');
+        const recordButton = document.getElementById('recordButton');
+        if (recordButton && !window.isRecording) {
+          // Trigger the record button click to start recording
+          recordButton.click();
+        }
+      }, 500);
+    } else {
+      console.log('Meeting already has a recording, skipping auto-start');
+    }
   });
 
   // Listen for recording completed events
@@ -3199,12 +3376,36 @@ document.addEventListener('DOMContentLoaded', async () => {
             aiSummaryEditor.value = meeting.aiSummary;
           }
 
+          // Refresh video player if recording is complete
+          if (meeting.videoPath || meeting.recallVideoUrl) {
+            loadMeetingVideo(meeting);
+          }
+
           // Note: Tab switch and spinner are already handled by the stop button handler
           // Backend triggers summarization automatically
         }
       });
     }
   });
+
+  // Listen for video URL updates from backend (when Recall upload completes)
+  window.electronAPI.onVideoUrlUpdated((data) => {
+    console.log('Video URL updated for meeting:', data.meetingId, 'URL:', data.videoUrl);
+
+    // If this is the currently edited meeting, reload and refresh video
+    if (currentEditingMeetingId === data.meetingId) {
+      loadMeetingsDataFromFile().then(() => {
+        const meeting = [...upcomingMeetings, ...pastMeetings].find(m => m.id === data.meetingId);
+        if (meeting) {
+          console.log('Refreshing video player with Recall URL');
+          loadMeetingVideo(meeting);
+        }
+      });
+    }
+  });
+
+  // Track summary generation timeout globally for cleanup
+  let summaryGenerationTimeout = null;
 
   // Listen for summary streaming updates from backend
   window.electronAPI.onSummaryUpdate((data) => {
@@ -3222,6 +3423,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Listen for summary generation completion
   window.electronAPI.onSummaryGenerated((meetingId) => {
     console.log('🔥 onSummaryGenerated EVENT FIRED for meeting:', meetingId);
+
+    // Clear safety timeout if it exists
+    if (summaryGenerationTimeout) {
+      clearTimeout(summaryGenerationTimeout);
+      summaryGenerationTimeout = null;
+      console.log('Cleared summary generation timeout');
+    }
 
     // Remove spinner from record button
     window.setRecordButtonLoading(false);
@@ -3761,12 +3969,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   const recordButton = document.getElementById('recordButton');
   if (recordButton) {
 
+    let isProcessing = false; // Flag to prevent double-clicks
+
     recordButton.addEventListener('click', async () => {
       // Only allow recording if we're in a note
       if (!currentEditingMeetingId) {
         alert('You need to be in a note to start recording');
         return;
       }
+
+      // Prevent double-clicks
+      if (isProcessing) {
+        console.log('Recording action already in progress, ignoring click');
+        return;
+      }
+      isProcessing = true;
 
       window.isRecording = !window.isRecording;
 
@@ -3778,7 +3995,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
           // Start recording
           console.log('Starting manual recording for meeting:', currentEditingMeetingId);
-          recordButton.disabled = true; // Temporarily disable to prevent double-clicks
 
           // Change to stop mode immediately for better feedback
           recordButton.classList.add('recording');
@@ -3787,7 +4003,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
           // Call the API to start recording
           const result = await window.electronAPI.startManualRecording(currentEditingMeetingId);
-          recordButton.disabled = false;
 
           if (result.success) {
             console.log('Manual recording started with ID:', result.recordingId);
@@ -3815,6 +4030,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             recordIcon.style.display = 'block';
             stopIcon.style.display = 'none';
           }
+          isProcessing = false; // Re-enable button clicks
         } catch (error) {
           // Handle errors
           console.error('Error starting recording:', error);
@@ -3825,7 +4041,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           recordButton.classList.remove('recording');
           recordIcon.style.display = 'block';
           stopIcon.style.display = 'none';
-          recordButton.disabled = false;
+          isProcessing = false; // Re-enable button clicks
         }
       } else {
         // Stop recording
@@ -3846,6 +4062,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Set loading state
             window.setRecordButtonLoading(true);
+
+            // Add a safety timeout to prevent infinite spinner (30 seconds)
+            summaryGenerationTimeout = setTimeout(() => {
+              console.warn('Summary generation timeout - forcing spinner to stop');
+              window.setRecordButtonLoading(false);
+              isProcessing = false;
+              summaryGenerationTimeout = null;
+            }, 30000);
 
             // Call the API to stop recording
             const result = await window.electronAPI.generateSummary(window.currentRecordingId);
@@ -3874,6 +4098,12 @@ document.addEventListener('DOMContentLoaded', async () => {
               console.error('Failed to stop recording:', result.error);
               alert('Failed to stop recording: ' + result.error);
 
+              // Clear safety timeout
+              if (summaryGenerationTimeout) {
+                clearTimeout(summaryGenerationTimeout);
+                summaryGenerationTimeout = null;
+              }
+
               // Restore recording state if failed
               window.isRecording = true;
               recordButton.classList.add('recording');
@@ -3884,6 +4114,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Reset recording ID
             window.currentRecordingId = null;
+            isProcessing = false; // Re-enable button clicks
           } catch (error) {
             console.error('Error stopping recording:', error);
             alert('Error stopping recording: ' + (error.message || error));
@@ -3894,6 +4125,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Reset button states
             window.setRecordButtonLoading(false);
+            isProcessing = false; // Re-enable button clicks
           }
         } else {
           console.warn('No active recording ID found');
@@ -3901,6 +4133,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           recordButton.classList.remove('recording');
           recordIcon.style.display = 'block';
           stopIcon.style.display = 'none';
+          isProcessing = false; // Re-enable button clicks
         }
       }
     });

@@ -54,6 +54,12 @@ let detectedMeeting = null;
 let handledMeetingSessions = new Set();
 // Track which recordings have already sent completion events
 let processedRecordingCompletions = new Set();
+// Track active calendar recordings to correlate with video meetings
+let activeCalendarRecordings = new Map(); // Map<recordingId, { meetingId, title, startTime, endTime, videoUrl, platform }>
+// Track recordings that are being switched (don't upload these when they end)
+let recordingsBeingSwitched = new Set();
+// Track pending switches: Map<meetingId, { platform, noteId }>
+let pendingSwitches = new Map();
 
 let mainWindow;
 let notificationWindow = null;
@@ -818,6 +824,18 @@ app.whenReady().then(async () => {
     }
   });
 
+  ipcMain.handle('calendar:getPastMeetings', async (event, days) => {
+    try {
+      const result = await apiService.getPastMeetings(days);
+      // Extract meetings array from the result
+      const meetings = result.meetings || result;
+      return { success: true, meetings };
+    } catch (error) {
+      console.error('Failed to fetch past meetings:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   ipcMain.handle('calendar:getMeetingDetails', async (event, eventId) => {
     try {
       const meeting = await apiService.getMeetingDetails(eventId);
@@ -1006,6 +1024,192 @@ const activeRecordings = {
   }
 };
 
+// Helper function to extract platform from video URL
+function extractPlatformFromUrl(url) {
+  if (!url) return null;
+
+  const urlLower = url.toLowerCase();
+  if (urlLower.includes('zoom')) return 'zoom';
+  if (urlLower.includes('meet.google') || urlLower.includes('meet.google.com')) return 'google-meet';
+  if (urlLower.includes('teams.microsoft')) return 'teams';
+  if (urlLower.includes('webex')) return 'webex';
+  if (urlLower.includes('gotomeeting')) return 'gotomeeting';
+  if (urlLower.includes('bluejeans')) return 'bluejeans';
+  if (urlLower.includes('whereby')) return 'whereby';
+
+  return null;
+}
+
+// Helper function to check if a detected meeting matches a calendar recording
+function correlateWithCalendarRecording(detectedWindow) {
+  const now = new Date();
+  const platform = detectedWindow.platform;
+
+  const logMsg1 = `[Correlation] Checking correlation for detected ${platform} meeting, title: ${detectedWindow.title}`;
+  const logMsg2 = `[Correlation] Active calendar recordings count: ${activeCalendarRecordings.size}`;
+  console.log(logMsg1);
+  console.log(logMsg2);
+
+  // Also write to file for debugging
+  const logPath = path.join(app.getPath('userData'), 'correlation-debug.log');
+  fs.appendFileSync(logPath, `\n${new Date().toISOString()} - ${logMsg1}\n${logMsg2}\n`);
+
+  for (const [recordingId, calendarMeeting] of activeCalendarRecordings) {
+    const logMsg3 = `[Correlation] Checking recording ${recordingId}: title="${calendarMeeting.title}", platform="${calendarMeeting.platform}", detectedPlatform="${platform}", startTime="${calendarMeeting.startTime}", currentTime="${now.toISOString()}"`;
+    console.log(logMsg3);
+    fs.appendFileSync(logPath, `${logMsg3}\n`);
+
+    // Platform matching
+    if (calendarMeeting.platform && calendarMeeting.platform === platform) {
+      console.log(`Platform match found: ${platform} for calendar meeting ${calendarMeeting.title}`);
+
+      // Time matching - check if we're within the meeting time window (with 5 min buffer)
+      if (calendarMeeting.startTime) {
+        const startTime = new Date(calendarMeeting.startTime);
+        const endTime = calendarMeeting.endTime ? new Date(calendarMeeting.endTime) : new Date(startTime.getTime() + 60 * 60 * 1000); // Default 1 hour
+        const bufferMinutes = 5;
+        const startBuffer = new Date(startTime.getTime() - bufferMinutes * 60 * 1000);
+        const endBuffer = new Date(endTime.getTime() + bufferMinutes * 60 * 1000);
+
+        if (now >= startBuffer && now <= endBuffer) {
+          console.log(`Time match found for calendar meeting: ${calendarMeeting.title}`);
+          return { recordingId, calendarMeeting };
+        }
+      }
+    }
+
+    // Title matching (fuzzy match) - if window title contains part of meeting title
+    if (detectedWindow.title && calendarMeeting.title) {
+      const windowTitle = detectedWindow.title.toLowerCase();
+      const meetingTitle = calendarMeeting.title.toLowerCase();
+
+      // Check if meeting title words appear in window title
+      const meetingWords = meetingTitle.split(/\s+/).filter(w => w.length > 3); // Skip short words
+      const matchingWords = meetingWords.filter(word => windowTitle.includes(word));
+
+      if (matchingWords.length >= Math.min(2, Math.ceil(meetingWords.length / 2))) {
+        console.log(`Title match found: "${detectedWindow.title}" matches "${calendarMeeting.title}"`);
+        return { recordingId, calendarMeeting };
+      }
+    }
+  }
+
+  return null;
+}
+
+// Helper function to check if a video meeting for the given platform is currently detected
+function checkForActiveVideoMeeting(platform) {
+  if (!detectedMeeting || !detectedMeeting.window) {
+    return null;
+  }
+
+  const detectedPlatform = detectedMeeting.window.platform;
+  const detectedAt = detectedMeeting.detectedAt;
+  const now = Date.now();
+  const fiveMinutesInMs = 5 * 60 * 1000;
+
+  // Check if the detected meeting matches the platform and was detected recently (within 5 minutes)
+  if (detectedPlatform === platform && (now - detectedAt) < fiveMinutesInMs) {
+    console.log(`Found active ${platform} meeting: window ID ${detectedMeeting.window.id}`);
+    return detectedMeeting.window;
+  }
+
+  return null;
+}
+
+// Function to switch from audio to video recording when video meeting detected
+async function switchToVideoRecording(audioRecordingId, videoWindowId, calendarMeetingId, uploadToken) {
+  try {
+    console.log('[SWITCH] Starting switch from audio to video recording');
+    console.log('[SWITCH] Audio ID:', audioRecordingId, 'Video ID:', videoWindowId, 'Calendar Meeting ID:', calendarMeetingId);
+
+    // Mark this recording as being switched (don't upload when it ends)
+    recordingsBeingSwitched.add(audioRecordingId);
+    console.log('[SWITCH] Marked audio recording to skip upload on end');
+
+    // Stop the audio-only recording
+    console.log('[SWITCH] Stopping audio recording...');
+    sdkLogger.logApiCall('stopRecording', {
+      windowId: audioRecordingId,
+      reason: 'Switching to video recording'
+    });
+
+    RecallAiSdk.stopRecording({
+      windowId: audioRecordingId
+    });
+
+    // CLEAN UP EVERYTHING related to audio recording
+    if (global.activeMeetingIds && global.activeMeetingIds[audioRecordingId]) {
+      delete global.activeMeetingIds[audioRecordingId];
+    }
+    activeRecordings.removeRecording(audioRecordingId);
+    activeCalendarRecordings.delete(audioRecordingId);
+    pendingSwitches.clear();
+    console.log('[SWITCH] Cleaned up ALL audio recording tracking');
+
+    // Wait for stop to process
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Read meetings data to get calendar meeting details
+    const meetingsData = await fileOperationManager.readMeetingsData();
+
+    // Find the calendar meeting
+    let calendarMeeting = meetingsData.upcomingMeetings.find(m => m.id === calendarMeetingId);
+    let wasInUpcoming = true;
+
+    if (!calendarMeeting) {
+      calendarMeeting = meetingsData.pastMeetings.find(m => m.id === calendarMeetingId);
+      wasInUpcoming = false;
+    }
+
+    if (!calendarMeeting) {
+      const errorMsg = `Calendar meeting ${calendarMeetingId} not found`;
+      console.error('[SWITCH ERROR]', errorMsg);
+      throw new Error(errorMsg);
+    }
+
+    console.log('[SWITCH] Found calendar meeting:', calendarMeeting.title);
+
+    // Store calendar meeting metadata before deleting
+    const calendarMetadata = {
+      calendarEventId: calendarMeeting.calendarEventId,
+      title: calendarMeeting.title,
+      date: calendarMeeting.date,
+      startTime: calendarMeeting.startTime,
+      endTime: calendarMeeting.endTime,
+      attendees: calendarMeeting.attendees,
+      location: calendarMeeting.location,
+      videoMeetingUrl: calendarMeeting.videoMeetingUrl,
+      organizerEmail: calendarMeeting.organizerEmail
+    };
+
+    // Delete the old calendar note from both lists
+    if (wasInUpcoming) {
+      meetingsData.upcomingMeetings = meetingsData.upcomingMeetings.filter(m => m.id !== calendarMeetingId);
+      console.log('[SWITCH] Deleted calendar note from upcomingMeetings');
+    } else {
+      meetingsData.pastMeetings = meetingsData.pastMeetings.filter(m => m.id !== calendarMeetingId);
+      console.log('[SWITCH] Deleted calendar note from pastMeetings');
+    }
+
+    // Save the deletion
+    await fileOperationManager.writeData(meetingsData);
+
+    // Now create a BRAND NEW note using the exact "Record Meeting with Video" workflow
+    const platformName = detectedMeeting.window?.platform || 'zoom';
+    const platformDisplay = platformName.charAt(0).toUpperCase() + platformName.slice(1);
+
+    console.log('[SWITCH] Creating brand new note (same as Record Meeting with Video button)');
+    const newNoteId = await createMeetingNoteAndRecord(platformDisplay, calendarMetadata);
+
+    console.log('[SWITCH] Successfully created new note:', newNoteId);
+    return newNoteId;
+  } catch (error) {
+    console.error('[SWITCH ERROR] Failed to switch to video recording:', error);
+    throw error;
+  }
+}
+
 // File operation manager to prevent race conditions on both reads and writes
 const fileOperationManager = {
   isProcessing: false,
@@ -1021,21 +1225,35 @@ const fileOperationManager = {
       return JSON.parse(JSON.stringify(this.cachedData)); // Deep clone
     }
 
-    try {
-      // Read from file
-      const fileData = await fs.promises.readFile(meetingsFilePath, 'utf8');
-      const data = JSON.parse(fileData);
+    // Retry logic for reading
+    let lastError = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        // Read from file
+        const fileData = await fs.promises.readFile(meetingsFilePath, 'utf8');
+        const data = JSON.parse(fileData);
 
-      // Update cache
-      this.cachedData = data;
-      this.lastReadTime = now;
+        // Update cache
+        this.cachedData = data;
+        this.lastReadTime = now;
 
-      return data;
-    } catch (error) {
-      console.error('Error reading meetings data:', error);
-      // If file doesn't exist or is invalid, return empty structure
-      return { upcomingMeetings: [], pastMeetings: [] };
+        return data;
+      } catch (error) {
+        lastError = error;
+        console.error(`Error reading meetings data (attempt ${attempt + 1}/3):`, error.message);
+
+        // If JSON parse error, wait a bit and retry (file might be mid-write)
+        if (error instanceof SyntaxError && attempt < 2) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          continue;
+        }
+        break;
+      }
     }
+
+    console.error('Failed to read meetings data after 3 attempts:', lastError);
+    // If file doesn't exist or is invalid, return empty structure
+    return { upcomingMeetings: [], pastMeetings: [] };
   },
 
   // Schedule an operation that needs to update the meetings data
@@ -1240,7 +1458,7 @@ function initSDK() {
   };
 
   // Helper function to handle meeting detection
-  const handleMeetingDetected = (evt) => {
+  const handleMeetingDetected = async (evt) => {
     console.log("Meeting detected:", evt);
 
     // Log the meeting detected event
@@ -1249,7 +1467,10 @@ function initSDK() {
       windowId: evt.window.id
     });
 
-    detectedMeeting = evt;
+    detectedMeeting = {
+      ...evt,
+      detectedAt: Date.now()
+    };
 
     // Map platform codes to readable names
     const platformNames = {
@@ -1283,7 +1504,52 @@ function initSDK() {
     // This persists for the entire meeting lifecycle, not just the recording
     const meetingSessionKey = `${evt.window.platform}-${evt.window.id}`;
 
-    // Check if this meeting is already on the calendar
+    // CRITICAL: Check if this detected meeting correlates with an active calendar recording
+    const correlation = correlateWithCalendarRecording(evt.window);
+    console.log('[CORRELATION CHECK] Result:', correlation ? `Found match for ${correlation.calendarMeeting.title}` : 'No match found');
+    console.log('[CORRELATION CHECK] Active calendar recordings:', activeCalendarRecordings.size, 'recordings');
+
+    if (correlation) {
+      console.log(`Detected meeting correlates with calendar recording: ${correlation.calendarMeeting.title}`);
+
+      // Don't show duplicate notification - we already have a recording running
+      handledMeetingSessions.add(meetingSessionKey);
+
+      // Switch from audio to video recording (keep same note, just update recording source)
+      try {
+        await switchToVideoRecording(
+          correlation.recordingId,
+          evt.window.id,
+          correlation.calendarMeeting.meetingId,
+          correlation.calendarMeeting.uploadToken
+        );
+
+        console.log('Successfully switched to video recording');
+
+        // Show a brief notification about the switch
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('show-toast', {
+            message: `Switched to video recording for ${correlation.calendarMeeting.title}`,
+            type: 'success'
+          });
+        }
+      } catch (error) {
+        console.error('[SWITCH FATAL ERROR] Failed to switch to video recording:', error);
+        console.error('[SWITCH FATAL ERROR] Stack trace:', error.stack);
+
+        // Show error to user
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('show-toast', {
+            message: `Failed to start video recording: ${error.message}`,
+            type: 'error'
+          });
+        }
+      }
+
+      return; // Don't show notification or do further processing
+    }
+
+    // Check if this meeting is already on the calendar (legacy check)
     const isCalendarMeeting = checkIfMeetingIsOnCalendar(evt.window);
 
     // Only show notification if we haven't handled this meeting session yet AND it's not a calendar meeting
@@ -1318,16 +1584,66 @@ function initSDK() {
 
   // Listen for meeting closed events
   RecallAiSdk.addEventListener('meeting-closed', (evt) => {
-    console.log("Meeting closed:", evt);
+    console.log("[MEETING-CLOSED] Meeting window closed:", evt.window.id, evt.window.platform);
 
     // Log the SDK meeting-closed event
     sdkLogger.logEvent('meeting-closed', {
-      windowId: evt.window.id
+      windowId: evt.window.id,
+      platform: evt.window.platform
     });
+
+    // FIRST: Stop any active recording for this meeting window
+    // This handles ALL types: switched meetings, auto-detected meetings, and manually started meetings
+    const recordingInfo = activeRecordings.getForRecording(evt.window.id);
+    if (recordingInfo) {
+      console.log(`[MEETING-CLOSED] Stopping active recording for closed window: ${evt.window.id}`);
+
+      try {
+        RecallAiSdk.stopRecording({
+          windowId: evt.window.id
+        });
+        console.log(`[MEETING-CLOSED] Stop command sent for recording ${evt.window.id}`);
+      } catch (error) {
+        console.error(`[MEETING-CLOSED] Error stopping recording ${evt.window.id}:`, error);
+      }
+
+      // Don't remove from activeRecordings yet - let recording-ended event handle that
+    } else {
+      console.log(`[MEETING-CLOSED] No active recording found for window ${evt.window.id}`);
+    }
 
     // Clean up the global tracking when a meeting ends
     if (evt.window && evt.window.id && global.activeMeetingIds && global.activeMeetingIds[evt.window.id]) {
-      console.log(`Cleaning up meeting tracking for: ${evt.window.id}`);
+      console.log(`[MEETING-CLOSED] Cleaning up meeting tracking for: ${evt.window.id}`);
+
+      // Check if we need to stop any related calendar recordings (for switched meetings)
+      const trackingInfo = global.activeMeetingIds[evt.window.id];
+      if (trackingInfo && trackingInfo.noteId) {
+        // Find and clean up any calendar recordings for the same meeting
+        for (const [recordingId, calendarMeeting] of activeCalendarRecordings) {
+          if (calendarMeeting.meetingId === trackingInfo.noteId && recordingId !== evt.window.id) {
+            console.log(`[MEETING-CLOSED] Stopping orphaned calendar recording ${recordingId} as video meeting closed`);
+
+            // Stop the audio recording if it's still running
+            try {
+              RecallAiSdk.stopRecording({
+                windowId: recordingId
+              });
+            } catch (error) {
+              console.error(`[MEETING-CLOSED] Error stopping calendar recording ${recordingId}:`, error);
+            }
+
+            // Clean up tracking
+            const recording = activeCalendarRecordings.get(recordingId);
+            if (recording && recording.pollInterval) {
+              clearInterval(recording.pollInterval);
+            }
+            activeCalendarRecordings.delete(recordingId);
+            activeRecordings.removeRecording(recordingId);
+          }
+        }
+      }
+
       delete global.activeMeetingIds[evt.window.id];
     }
 
@@ -1335,7 +1651,7 @@ function initSDK() {
     if (evt.window && evt.window.id && evt.window.platform) {
       const meetingSessionKey = `${evt.window.platform}-${evt.window.id}`;
       handledMeetingSessions.delete(meetingSessionKey);
-      console.log(`Cleared session tracking for: ${meetingSessionKey}`);
+      console.log(`[MEETING-CLOSED] Cleared session tracking for: ${meetingSessionKey}`);
     }
 
     detectedMeeting = null;
@@ -1349,57 +1665,159 @@ function initSDK() {
   // Listen for recording ended events
   RecallAiSdk.addEventListener('recording-ended', async (evt) => {
     console.log("Recording ended:", evt);
+    console.log("[RECORDING-ENDED] Window ID:", evt.window.id);
+    console.log("[RECORDING-ENDED] Platform:", evt.window.platform);
 
     // Log the SDK recording-ended event
     sdkLogger.logEvent('recording-ended', {
       windowId: evt.window.id
     });
 
+    // Check if this recording is being switched - if so, skip upload
+    console.log("[RECORDING-ENDED] Recordings being switched:", Array.from(recordingsBeingSwitched));
+    if (recordingsBeingSwitched.has(evt.window.id)) {
+      console.log(`[SWITCH] Skipping upload for switched recording: ${evt.window.id}`);
+      recordingsBeingSwitched.delete(evt.window.id);
+
+      // Still need to remove from activeRecordings even if we skip upload
+      activeRecordings.removeRecording(evt.window.id);
+      console.log(`[SWITCH] Removed switched recording ${evt.window.id} from activeRecordings`);
+      return;
+    }
+
+    console.log("[RECORDING-ENDED] Not a switched recording, proceeding with normal cleanup");
+
+    // Clean up calendar recordings tracking if this was a calendar recording
+    if (activeCalendarRecordings.has(evt.window.id)) {
+      console.log(`Cleaning up calendar recording tracking for: ${evt.window.id}`);
+      const recording = activeCalendarRecordings.get(evt.window.id);
+      if (recording && recording.pollInterval) {
+        clearInterval(recording.pollInterval);
+      }
+      activeCalendarRecordings.delete(evt.window.id);
+    }
+
+    // Get note ID before removing from tracker
+    let noteId = null;
+
+    // First, try to find in activeRecordings
+    for (const [recId, info] of Object.entries(activeRecordings.recordings)) {
+      if (recId === evt.window.id) {
+        noteId = info.noteId;
+        console.log(`[CLEANUP] Found noteId ${noteId} for recording ${recId} in activeRecordings`);
+        break;
+      }
+    }
+
+    // If not found in activeRecordings, try global.activeMeetingIds
+    if (!noteId && global.activeMeetingIds && global.activeMeetingIds[evt.window.id]) {
+      noteId = global.activeMeetingIds[evt.window.id].noteId;
+      console.log(`[CLEANUP] Found noteId ${noteId} for recording ${evt.window.id} in global.activeMeetingIds`);
+    }
+
+    // If still not found, try to find it by searching the meetings file
+    if (!noteId) {
+      console.log(`[CLEANUP] noteId not found in trackers, searching meetings file for recording ${evt.window.id}`);
+      try {
+        const meetingsData = await fileOperationManager.readMeetingsData();
+        let meeting = meetingsData.pastMeetings.find(m => m.recordingId === evt.window.id);
+        if (!meeting) {
+          meeting = meetingsData.upcomingMeetings.find(m => m.recordingId === evt.window.id);
+        }
+        if (meeting) {
+          noteId = meeting.id;
+          console.log(`[CLEANUP] Found noteId ${noteId} for recording ${evt.window.id} in meetings file`);
+        } else {
+          console.warn(`[CLEANUP] Could not find meeting with recordingId ${evt.window.id} anywhere`);
+        }
+      } catch (err) {
+        console.error(`[CLEANUP] Error searching for noteId:`, err);
+      }
+    }
+
+    // Remove from active recordings tracker
+    const removed = activeRecordings.removeRecording(evt.window.id);
+    console.log(`[CLEANUP] Removed recording ${evt.window.id} from activeRecordings: ${removed}`);
+
+    // Log current state
+    console.log('[CLEANUP] Current activeRecordings:', Object.keys(activeRecordings.recordings));
+
+    // Notify renderer that recording has stopped
+    if (mainWindow && !mainWindow.isDestroyed() && noteId) {
+      console.log(`[CLEANUP] Sending recording-state-change (idle) to renderer for note ${noteId}`);
+      mainWindow.webContents.send('recording-state-change', {
+        recordingId: evt.window.id,
+        state: 'idle',
+        noteId: noteId
+      });
+    } else {
+      console.log('[CLEANUP] Not sending recording-state-change:', {
+        hasWindow: !!mainWindow,
+        isDestroyed: mainWindow?.isDestroyed(),
+        hasNoteId: !!noteId
+      });
+    }
+
     try {
       // Update the note with recording information
       await updateNoteWithRecordingInfo(evt.window.id);
 
       // Add a small delay before uploading (good practice for file system operations)
+      console.log(`[UPLOAD] Scheduling upload for recording ${evt.window.id} in 3 seconds...`);
       setTimeout(async () => {
-        try {
-          // Try to get a new upload token for the upload if needed
-          const uploadData = await createDesktopSdkUpload();
+        console.log(`[UPLOAD] Starting upload process for recording ${evt.window.id}`);
 
-          if (uploadData && uploadData.upload_token) {
-            console.log('Uploading recording with new upload token:', uploadData.upload_token);
+        // Check if recording file exists for this window ID
+        const possibleFilePaths = [
+          path.join(RECORDING_PATH, `${evt.window.id}.mp4`),
+          path.join(RECORDING_PATH, `macos-desktop-${evt.window.id}.mp4`),
+          path.join(RECORDING_PATH, `macos-desktop${evt.window.id}.mp4`),
+          path.join(RECORDING_PATH, `desktop-${evt.window.id}.mp4`)
+        ];
 
-            // Log the uploadRecording API call
-            sdkLogger.logApiCall('uploadRecording', {
-              windowId: evt.window.id,
-              uploadToken: `${uploadData.upload_token.substring(0, 8)}...` // Log truncated token for security
-            });
-
-            RecallAiSdk.uploadRecording({
-              windowId: evt.window.id,
-              uploadToken: uploadData.upload_token
-            });
-          } else {
-            // Fallback to regular upload
-            console.log('Uploading recording without new token');
-
-            // Log the uploadRecording API call (fallback)
-            sdkLogger.logApiCall('uploadRecording', {
-              windowId: evt.window.id
-            });
-
-            RecallAiSdk.uploadRecording({ windowId: evt.window.id });
+        let recordingFileExists = false;
+        let foundFilePath = null;
+        for (const filePath of possibleFilePaths) {
+          if (fs.existsSync(filePath)) {
+            recordingFileExists = true;
+            foundFilePath = filePath;
+            const stats = fs.statSync(filePath);
+            console.log(`[UPLOAD] Found recording file: ${filePath} (${stats.size} bytes)`);
+            break;
           }
-        } catch (uploadError) {
-          console.error('Error during upload:', uploadError);
-          // Fallback to regular upload
+        }
 
-          // Log the uploadRecording API call (error fallback)
+        if (!recordingFileExists) {
+          console.error(`[UPLOAD ERROR] No recording file found for window ID ${evt.window.id}`);
+          console.error(`[UPLOAD ERROR] Checked paths:`, possibleFilePaths);
+
+          // List all files in recording directory to see what's there
+          try {
+            const allFiles = fs.readdirSync(RECORDING_PATH);
+            console.log(`[UPLOAD ERROR] Files in recording directory:`, allFiles);
+          } catch (err) {
+            console.error(`[UPLOAD ERROR] Could not list recording directory:`, err);
+          }
+          return;
+        }
+
+        try {
+          // The SDK should automatically upload using the upload token from startRecording
+          // We don't need to provide a new token here
+          console.log('[UPLOAD] Initiating upload (SDK will use token from startRecording)');
+
+          // Log the uploadRecording API call
           sdkLogger.logApiCall('uploadRecording', {
-            windowId: evt.window.id,
-            error: 'Fallback after error'
+            windowId: evt.window.id
           });
 
-          RecallAiSdk.uploadRecording({ windowId: evt.window.id });
+          RecallAiSdk.uploadRecording({
+            windowId: evt.window.id
+          });
+          console.log('[UPLOAD] Upload initiated with SDK for file:', foundFilePath);
+        } catch (uploadError) {
+          console.error('[UPLOAD ERROR] Error during upload:', uploadError);
+          console.error('[UPLOAD ERROR] Error details:', uploadError.message, uploadError.stack);
         }
       }, 3000); // Wait 3 seconds before uploading
     } catch (error) {
@@ -1414,18 +1832,73 @@ function initSDK() {
   // Track upload progress
   RecallAiSdk.addEventListener('upload-progress', async (evt) => {
     const { progress, window } = evt;
-    console.log(`Upload progress: ${progress}%`);
+    console.log(`[UPLOAD PROGRESS] ${progress}% for recording: ${window.id}`);
 
     // Log the SDK upload-progress event
-    // sdkLogger.logEvent('upload-progress', {
-    //   windowId: window.id,
-    //   progress
-    // });
+    sdkLogger.logEvent('upload-progress', {
+      windowId: window.id,
+      progress
+    });
 
-    // Update the note with upload progress if needed
+    // When upload completes, fetch the video URL from Recall
     if (progress === 100) {
-      console.log(`Upload completed for recording: ${window.id}`);
-      // Could update the note here with upload completion status
+      console.log(`[UPLOAD COMPLETE] Upload completed for recording: ${window.id}`);
+
+      // Wait a bit for Recall to process the upload
+      setTimeout(async () => {
+        try {
+          // Find the meeting associated with this recording
+          const meetingsData = await fileOperationManager.readMeetingsData();
+          let meeting = meetingsData.pastMeetings.find(m => m.recordingId === window.id);
+          let meetingsArray = meetingsData.pastMeetings;
+
+          if (!meeting) {
+            meeting = meetingsData.upcomingMeetings.find(m => m.recordingId === window.id);
+            meetingsArray = meetingsData.upcomingMeetings;
+          }
+
+          if (meeting && meeting.calendarEventId) {
+            console.log(`[UPLOAD COMPLETE] Fetching video URL from API for meeting: ${meeting.calendarEventId}`);
+
+            try {
+              const videoData = await apiService.getMeetingVideoUrl(meeting.calendarEventId);
+
+              if (videoData && videoData.url) {
+                console.log(`[UPLOAD COMPLETE] Got video URL from API: ${videoData.url}`);
+
+                // Update meeting with the Recall video URL
+                meeting.recallVideoUrl = videoData.url;
+                meeting.videoSource = 'recall';
+
+                // Clear local video path since we have the Recall URL now
+                delete meeting.videoPath;
+
+                await fileOperationManager.writeData(meetingsData);
+
+                // Notify renderer to refresh the video player
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                  mainWindow.webContents.send('video-url-updated', {
+                    meetingId: meeting.id,
+                    videoUrl: videoData.url
+                  });
+                }
+
+                console.log(`[UPLOAD COMPLETE] Updated meeting with Recall video URL`);
+              } else {
+                console.warn(`[UPLOAD COMPLETE] No video URL in API response for meeting ${meeting.calendarEventId}`);
+              }
+            } catch (apiError) {
+              // API might return 404 if the recording hasn't been processed yet or doesn't exist
+              // This is expected for new recordings - the backend needs to be updated with the recording metadata
+              console.log(`[UPLOAD COMPLETE] Could not fetch video URL from API (${apiError.message}). Recording will be available locally.`);
+            }
+          } else {
+            console.log(`[UPLOAD COMPLETE] Meeting does not have calendarEventId, skipping video URL fetch`);
+          }
+        } catch (error) {
+          console.error(`[UPLOAD COMPLETE] Error fetching video URL from API:`, error);
+        }
+      }, 10000); // Wait 10 seconds for Recall to process
     }
   });
 
@@ -1446,6 +1919,62 @@ function initSDK() {
       let noteId = null;
       if (global.activeMeetingIds && global.activeMeetingIds[window.id]) {
         noteId = global.activeMeetingIds[window.id].noteId;
+      }
+
+      // Check if this is a pending switch - if so, register it
+      if (!noteId && code === 'recording' && pendingSwitches.size > 0) {
+        for (const [meetingId, switchInfo] of pendingSwitches.entries()) {
+          if (switchInfo.platform === window.platform) {
+            console.log('[SWITCH] Matched pending switch:', meetingId, 'to window:', window.id);
+            noteId = switchInfo.noteId;
+            global.activeMeetingIds[window.id] = {
+              platformName: window.platform,
+              noteId: noteId
+            };
+            pendingSwitches.delete(meetingId);
+
+            // Update the meeting's recordingId to the actual window ID that started recording
+            console.log('[SWITCH] Updating meeting recordingId from previous to:', window.id);
+            (async () => {
+              try {
+                const meetingsData = await fileOperationManager.readMeetingsData();
+                let meeting = meetingsData.pastMeetings.find(m => m.id === noteId);
+                if (!meeting) {
+                  meeting = meetingsData.upcomingMeetings.find(m => m.id === noteId);
+                }
+                if (meeting) {
+                  const oldRecordingId = meeting.recordingId;
+                  meeting.recordingId = window.id;
+                  await fileOperationManager.writeData(meetingsData);
+                  console.log('[SWITCH] Updated meeting recordingId from', oldRecordingId, 'to', window.id);
+
+                  // Remove ALL recording IDs for this meeting from activeRecordings
+                  // This handles cases where Zoom creates multiple window IDs
+                  console.log('[SWITCH] Removing all old recording IDs for meeting from activeRecordings');
+                  const recordingsToRemove = [];
+                  for (const [recId, info] of Object.entries(activeRecordings.recordings)) {
+                    if (info.noteId === noteId && recId !== window.id) {
+                      recordingsToRemove.push(recId);
+                    }
+                  }
+
+                  recordingsToRemove.forEach(recId => {
+                    console.log('[SWITCH] Removing old recording ID:', recId);
+                    activeRecordings.removeRecording(recId);
+                  });
+
+                  console.log('[SWITCH] Cleanup complete. Current activeRecordings:', Object.keys(activeRecordings.recordings));
+                } else {
+                  console.error('[SWITCH] Could not find meeting to update recordingId:', noteId);
+                }
+              } catch (err) {
+                console.error('[SWITCH] Error updating meeting recordingId:', err);
+              }
+            })();
+
+            break;
+          }
+        }
       }
 
       // Update the recording state in our tracker
@@ -1541,6 +2070,17 @@ ipcMain.handle('getVideoFile', async (event, videoPath) => {
       return { success: false, error: 'Video file not found' };
     }
 
+    // Check file size - if too large (>50MB), don't load to prevent crash
+    const stats = fs.statSync(videoPath);
+    const fileSizeInMB = stats.size / (1024 * 1024);
+
+    if (fileSizeInMB > 50) {
+      console.warn(`Video file too large (${fileSizeInMB.toFixed(2)}MB) - skipping base64 encoding to prevent crash`);
+      return { success: false, error: `Video file too large (${fileSizeInMB.toFixed(2)}MB). Video is uploading to cloud - please wait and refresh.` };
+    }
+
+    console.log(`Loading video file: ${videoPath} (${fileSizeInMB.toFixed(2)}MB)`);
+
     // Read the video file as a buffer
     const videoBuffer = fs.readFileSync(videoPath);
 
@@ -1565,12 +2105,14 @@ ipcMain.handle('debugGetHandlers', async () => {
 
 // Handler to get active recording ID for a note
 ipcMain.handle('getActiveRecordingId', async (event, noteId) => {
-  console.log(`getActiveRecordingId called for note: ${noteId}`);
+  console.log(`[getActiveRecordingId] Called for note: ${noteId}`);
+  console.log('[getActiveRecordingId] Current activeRecordings:', Object.keys(activeRecordings.recordings));
 
   try {
     // If noteId is provided, get recording for that specific note
     if (noteId) {
       const recordingInfo = activeRecordings.getForNote(noteId);
+      console.log(`[getActiveRecordingId] Recording info for note ${noteId}:`, recordingInfo);
       return {
         success: true,
         data: recordingInfo
@@ -1578,9 +2120,11 @@ ipcMain.handle('getActiveRecordingId', async (event, noteId) => {
     }
 
     // Otherwise return all active recordings
+    const allRecordings = activeRecordings.getAll();
+    console.log('[getActiveRecordingId] All active recordings:', allRecordings);
     return {
       success: true,
-      data: activeRecordings.getAll()
+      data: allRecordings
     };
   } catch (error) {
     console.error('Error getting active recording ID:', error);
@@ -1771,6 +2315,51 @@ ipcMain.handle('startManualRecording', async (event, meetingId) => {
       return { success: false, error: 'Meeting not found' };
     }
 
+    // SCENARIO 2: Check if video meeting is already detected and running
+    const extractedPlatform = extractPlatformFromUrl(meeting.videoMeetingUrl);
+    if (extractedPlatform) {
+      const existingVideoMeeting = checkForActiveVideoMeeting(extractedPlatform);
+
+      if (existingVideoMeeting) {
+        console.log(`Found active ${extractedPlatform} meeting already running, starting directly in video mode`);
+
+        // Start directly in video mode using the existing createMeetingNoteAndRecord function
+        const platformNames = {
+          'zoom': 'Zoom',
+          'google-meet': 'Google Meet',
+          'teams': 'Microsoft Teams',
+          'webex': 'Webex',
+          'gotomeeting': 'GoToMeeting',
+          'bluejeans': 'BlueJeans',
+          'whereby': 'Whereby'
+        };
+        const platformName = platformNames[extractedPlatform] || extractedPlatform;
+
+        const noteId = await createMeetingNoteAndRecord(platformName, meeting);
+
+        // IMPORTANT: Track this as a calendar recording so it can be switched if needed
+        // This handles the case where user has Zoom open, starts recording, then a NEW Zoom window appears
+        activeCalendarRecordings.set(existingVideoMeeting.id, {
+          meetingId: noteId,
+          title: meeting.title || '',
+          startTime: meeting.startTime || meeting.date,
+          endTime: meeting.endTime,
+          videoUrl: meeting.videoMeetingUrl || '',
+          platform: extractedPlatform,
+          audioOnly: false, // This is a video recording
+          uploadToken: null // Will be created in createMeetingNoteAndRecord
+        });
+        console.log('[TRACKING] Added direct video recording to calendar recordings for potential switching');
+
+        return {
+          success: true,
+          recordingId: existingVideoMeeting.id,
+          noteId: noteId,
+          message: 'Started video recording'
+        };
+      }
+    }
+
     try {
       // Prepare desktop audio recording - this is the key difference from our previous implementation
       // It returns a key that we use as the window ID
@@ -1804,6 +2393,36 @@ ipcMain.handle('startManualRecording', async (event, meetingId) => {
 
       // Register the recording in our active recordings tracker
       activeRecordings.addRecording(key, meetingId, 'Desktop Recording');
+
+      // Track this as an active calendar recording for correlation with video meetings
+      const extractedPlatform = extractPlatformFromUrl(meeting.videoMeetingUrl);
+      console.log('[TRACKING] Extracted platform:', extractedPlatform, 'from URL:', meeting.videoMeetingUrl);
+
+      activeCalendarRecordings.set(key, {
+        meetingId: meetingId,
+        title: meeting.title || '',
+        startTime: meeting.startTime || meeting.date,
+        endTime: meeting.endTime,
+        videoUrl: meeting.videoMeetingUrl || '',
+        platform: extractedPlatform,
+        audioOnly: true,
+        uploadToken: uploadData.upload_token
+      });
+      console.log('Tracking calendar recording:', {
+        key,
+        meetingId,
+        title: meeting.title,
+        videoUrl: meeting.videoMeetingUrl,
+        extractedPlatform,
+        startTime: meeting.startTime || meeting.date,
+        endTime: meeting.endTime
+      });
+      console.log('[TRACKING] Total active calendar recordings:', activeCalendarRecordings.size);
+
+      // Note: We rely on Recall SDK's meeting-detected event for video meeting detection
+      // The event fires automatically when the user joins a video meeting (Zoom, Google Meet, etc.)
+      // The correlation logic in handleMeetingDetected will automatically switch to video recording
+      console.log('Calendar recording tracked - will auto-switch to video if Zoom meeting is joined');
 
       // Save the updated data
       await fileOperationManager.writeData(meetingsData);
@@ -1839,7 +2458,45 @@ ipcMain.handle('startManualRecording', async (event, meetingId) => {
 // Handle generating summary (stops recording and triggers summary generation)
 async function handleGenerateSummary(recordingId) {
   try {
-    console.log(`Generating summary for recording: ${recordingId}`);
+    console.log(`[STOP] Generating summary for recording: ${recordingId}`);
+    console.log('[STOP] Current activeRecordings:', Object.keys(activeRecordings.recordings));
+
+    // Clean up calendar recording tracking if applicable
+    if (activeCalendarRecordings.has(recordingId)) {
+      console.log(`Cleaning up calendar recording tracking for: ${recordingId}`);
+      const recording = activeCalendarRecordings.get(recordingId);
+      if (recording && recording.pollInterval) {
+        clearInterval(recording.pollInterval);
+        console.log('Cleared poll interval for calendar recording');
+      }
+      activeCalendarRecordings.delete(recordingId);
+    }
+
+    // Check if this recording ID exists in activeRecordings
+    const recordingInfo = activeRecordings.recordings[recordingId];
+    if (!recordingInfo) {
+      console.warn(`[STOP] Recording ${recordingId} not found in activeRecordings!`);
+      console.warn('[STOP] This might be an old/stale recording ID');
+
+      // Try to find the actual active recording for this meeting
+      // First, find which meeting this recordingId belongs to
+      const meetingsData = await fileOperationManager.readMeetingsData();
+      let meeting = meetingsData.pastMeetings.find(m => m.recordingId === recordingId);
+      if (!meeting) {
+        meeting = meetingsData.upcomingMeetings.find(m => m.recordingId === recordingId);
+      }
+
+      if (meeting) {
+        console.log(`[STOP] Found meeting: ${meeting.title} (${meeting.id})`);
+        // Check if there's a different active recording for this meeting
+        const actualRecording = activeRecordings.getForNote(meeting.id);
+        if (actualRecording && actualRecording.recordingId !== recordingId) {
+          console.log(`[STOP] Found actual active recording: ${actualRecording.recordingId}`);
+          console.log(`[STOP] Switching to stop the actual recording instead of ${recordingId}`);
+          recordingId = actualRecording.recordingId;
+        }
+      }
+    }
 
     // Stop the recording - using the windowId property as shown in the reference
 
@@ -1851,9 +2508,31 @@ async function handleGenerateSummary(recordingId) {
     // Update our active recordings tracker
     activeRecordings.updateState(recordingId, 'stopping');
 
+    // Get the note ID for this recording
+    let noteId = null;
+    for (const [recId, info] of Object.entries(activeRecordings.recordings)) {
+      if (recId === recordingId) {
+        noteId = info.noteId;
+        break;
+      }
+    }
+
+    console.log(`[STOP] Calling SDK stopRecording for: ${recordingId}`);
+
+    // Notify renderer immediately that we're stopping
+    if (mainWindow && !mainWindow.isDestroyed() && noteId) {
+      mainWindow.webContents.send('recording-state-change', {
+        recordingId: recordingId,
+        state: 'stopping',
+        noteId: noteId
+      });
+    }
+
     RecallAiSdk.stopRecording({
       windowId: recordingId
     });
+
+    console.log(`[STOP] SDK stopRecording called for: ${recordingId}`);
 
     // The recording-ended event will be triggered automatically,
     // which will handle uploading and generating the summary
@@ -1863,6 +2542,15 @@ async function handleGenerateSummary(recordingId) {
     setTimeout(async () => {
       console.log('Fallback: Triggering updateNoteWithRecordingInfo after 2 seconds');
       await updateNoteWithRecordingInfo(recordingId);
+
+      // Send final idle state to renderer
+      if (mainWindow && !mainWindow.isDestroyed() && noteId) {
+        mainWindow.webContents.send('recording-state-change', {
+          recordingId: recordingId,
+          state: 'idle',
+          noteId: noteId
+        });
+      }
     }, 2000);
 
     return { success: true };
@@ -1874,6 +2562,16 @@ async function handleGenerateSummary(recordingId) {
 
 ipcMain.handle('generateSummary', async (event, recordingId) => {
   return handleGenerateSummary(recordingId);
+});
+
+// Debug handler to check active calendar recordings
+ipcMain.handle('debug-get-active-calendar-recordings', async () => {
+  const recordings = Array.from(activeCalendarRecordings.entries()).map(([id, data]) => ({
+    recordingId: id,
+    ...data
+  }));
+  console.log('Active calendar recordings:', recordings);
+  return recordings;
 });
 
 // Test notification handler
@@ -2100,8 +2798,8 @@ ipcMain.handle('loadMeetingsData', async () => {
 
 
 // Function to create a new meeting note and start recording
-async function createMeetingNoteAndRecord(platformName) {
-  console.log("Creating meeting note for platform:", platformName);
+async function createMeetingNoteAndRecord(platformName, calendarMeeting = null) {
+  console.log("Creating meeting note for platform:", platformName, calendarMeeting ? "(with calendar metadata)" : "(ad-hoc)");
   try {
     if (!detectedMeeting) {
       console.error('No active meeting detected');
@@ -2129,23 +2827,44 @@ async function createMeetingNoteAndRecord(platformName) {
     // Current date and time
     const now = new Date();
 
-    // Create a template for the note content
-    const template = `# ${platformName} Meeting Notes\nRecording: In Progress...`;
-
     // Create a new meeting object
-    const newMeeting = {
-      id: id,
-      type: 'document',
-      title: `${platformName} Meeting - ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
-      subtitle: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      hasDemo: false,
-      date: now.toISOString(),
-      participants: [],
-      content: template,
-      recordingId: detectedMeeting.window.id,
-      platform: platformName,
-      transcript: [] // Initialize an empty array for transcript data
-    };
+    let newMeeting;
+
+    if (calendarMeeting) {
+      // Use calendar meeting metadata
+      console.log('Creating note from calendar meeting:', calendarMeeting.title);
+
+      // Remove from upcomingMeetings if it exists there
+      meetingsData.upcomingMeetings = meetingsData.upcomingMeetings.filter(m => m.id !== calendarMeeting.id);
+
+      newMeeting = {
+        ...calendarMeeting,
+        id: id, // Use new ID for the recorded meeting
+        recordingId: detectedMeeting.window.id,
+        videoRecording: true,
+        recordingComplete: false,
+        platform: platformName,
+        content: calendarMeeting.content || `# ${calendarMeeting.title}\n\nRecording: In Progress...`,
+        transcript: [] // Initialize empty transcript array
+      };
+    } else {
+      // Create ad-hoc meeting
+      const template = `# ${platformName} Meeting Notes\nRecording: In Progress...`;
+
+      newMeeting = {
+        id: id,
+        type: 'document',
+        title: `${platformName} Meeting - ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+        subtitle: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        hasDemo: false,
+        date: now.toISOString(),
+        participants: [],
+        content: template,
+        recordingId: detectedMeeting.window.id,
+        platform: platformName,
+        transcript: [] // Initialize an empty array for transcript data
+      };
+    }
 
     // Update the active meeting tracking with the note ID
     if (global.activeMeetingIds && global.activeMeetingIds[detectedMeeting.window.id]) {
@@ -2694,20 +3413,32 @@ async function updateNoteWithRecordingInfo(recordingId) {
       processedRecordingCompletions.delete(firstEntry);
     }
 
-    // Read the current meetings data
+    // Read the current meetings data using retry logic
     let meetingsData;
     try {
-      const fileData = await fs.promises.readFile(meetingsFilePath, 'utf8');
-      meetingsData = JSON.parse(fileData);
+      meetingsData = await fileOperationManager.readMeetingsData();
     } catch (error) {
-      console.error('Error reading meetings data:', error);
+      console.error('[CRITICAL] Error reading meetings data after retries:', error);
+      console.error('[CRITICAL] Failed to read meetings data, cannot update note');
       return;
     }
 
-    // Find the meeting note with this recording ID
-    const noteIndex = meetingsData.pastMeetings.findIndex(meeting =>
+    // Find the meeting note with this recording ID - check both arrays
+    let noteIndex = meetingsData.pastMeetings.findIndex(meeting =>
       meeting.recordingId === recordingId
     );
+    let meetingsArray = meetingsData.pastMeetings;
+
+    // If not found in pastMeetings, check upcomingMeetings
+    if (noteIndex === -1) {
+      noteIndex = meetingsData.upcomingMeetings.findIndex(meeting =>
+        meeting.recordingId === recordingId
+      );
+      if (noteIndex !== -1) {
+        meetingsArray = meetingsData.upcomingMeetings;
+        console.log('Found recording in upcomingMeetings array');
+      }
+    }
 
     if (noteIndex === -1) {
       console.log('No meeting note found for recording ID:', recordingId);
@@ -2719,7 +3450,7 @@ async function updateNoteWithRecordingInfo(recordingId) {
     const formattedDate = now.toLocaleString();
 
     // Update the meeting note content
-    const meeting = meetingsData.pastMeetings[noteIndex];
+    const meeting = meetingsArray[noteIndex];
     const content = meeting.content;
 
     // Replace the "Recording: In Progress..." line with completed information
@@ -2861,8 +3592,67 @@ async function updateNoteWithRecordingInfo(recordingId) {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('recording-completed', meeting.id);
     }
+
+    // Attempt to fetch Recall video URL if this meeting has a calendar event ID
+    if (meeting.calendarEventId) {
+      console.log(`[RECALL VIDEO] Attempting to fetch video URL for meeting ${meeting.calendarEventId}`);
+
+      // Wait for Recall to process the recording (30 seconds)
+      setTimeout(async () => {
+        try {
+          console.log(`[RECALL VIDEO] Fetching video URL from API...`);
+          const videoData = await apiService.getMeetingVideoUrl(meeting.calendarEventId);
+
+          if (videoData && videoData.url) {
+            console.log(`[RECALL VIDEO] Got video URL from API: ${videoData.url}`);
+
+            // Re-read meetings data to get latest state
+            const latestMeetingsData = await fileOperationManager.readMeetingsData();
+            let latestMeeting = latestMeetingsData.pastMeetings.find(m => m.id === meeting.id);
+
+            if (!latestMeeting) {
+              latestMeeting = latestMeetingsData.upcomingMeetings.find(m => m.id === meeting.id);
+            }
+
+            if (latestMeeting) {
+              // Update meeting with Recall video URL
+              latestMeeting.recallVideoUrl = videoData.url;
+              latestMeeting.videoSource = 'recall';
+
+              // Clear local video path since we have Recall URL
+              delete latestMeeting.videoPath;
+
+              await fileOperationManager.writeData(latestMeetingsData);
+
+              // Notify renderer
+              if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('video-url-updated', {
+                  meetingId: meeting.id,
+                  videoUrl: videoData.url
+                });
+              }
+
+              console.log(`[RECALL VIDEO] Updated meeting ${meeting.id} with Recall video URL`);
+            }
+          } else {
+            console.warn(`[RECALL VIDEO] No video URL returned from API for meeting ${meeting.calendarEventId}`);
+          }
+        } catch (error) {
+          console.error(`[RECALL VIDEO] Error fetching video URL:`, error);
+        }
+      }, 30000); // Wait 30 seconds for Recall to process
+    }
+
+    // Ensure recording is removed from active recordings tracker
+    console.log(`[updateNoteWithRecordingInfo] Removing recording ${recordingId} from activeRecordings`);
+    const removed = activeRecordings.removeRecording(recordingId);
+    console.log(`[updateNoteWithRecordingInfo] Removed recording ${recordingId}: ${removed}`);
+    console.log('[updateNoteWithRecordingInfo] Current activeRecordings:', Object.keys(activeRecordings.recordings));
   } catch (error) {
     console.error('Error updating note with recording info:', error);
+    // Even on error, try to clean up the recording state
+    console.log(`[updateNoteWithRecordingInfo ERROR] Removing recording ${recordingId} from activeRecordings`);
+    activeRecordings.removeRecording(recordingId);
   }
 }
 
