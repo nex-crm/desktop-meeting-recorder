@@ -60,6 +60,8 @@
     "easymde": "^2.20.0",
     "electron-squirrel-startup": "^1.0.1",
     "electron-store": "^8.1.0",
+    "google-auth-library": "^10.4.0",
+    "googleapis": "^162.0.0",
     "jsonwebtoken": "^9.0.2",
     "marked": "^5.0.0",
     "node-schedule": "^2.1.1",

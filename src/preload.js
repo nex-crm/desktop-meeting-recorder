@@ -52,6 +52,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     isAuthenticated: () => ipcRenderer.invoke('auth:isAuthenticated'),
     onAuthSuccess: (callback) => ipcRenderer.on('auth:success', callback),
     onAuthLogout: (callback) => ipcRenderer.on('auth:logout', callback),
+
+    // Google OAuth APIs
+    google: {
+      authenticate: () => ipcRenderer.invoke('auth:google:authenticate'),
+      isAvailable: () => ipcRenderer.invoke('auth:google:isAvailable'),
+    },
   },
 
   // Calendar APIs

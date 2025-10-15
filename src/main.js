@@ -778,6 +778,23 @@ app.whenReady().then(async () => {
     return authService.isAuthenticated();
   });
 
+  // Google OAuth handlers
+  ipcMain.handle('auth:google:authenticate', async () => {
+    try {
+      const result = await authService.authenticateWithGoogle();
+      const user = authService.getUser();
+      const workspace = authService.getWorkspace();
+      return { success: true, result, user, workspace };
+    } catch (error) {
+      console.error('Google authentication error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('auth:google:isAvailable', async () => {
+    return !!authService.googleOAuth;
+  });
+
   // Notification window IPC handlers
   ipcMain.on('close-notification', () => {
     if (notificationWindow && !notificationWindow.isDestroyed()) {
@@ -1362,7 +1379,7 @@ async function createDesktopSdkUpload() {
               "redact": [],
               "diarize": true,
               "smart_format": true,
-              "interim_results": false
+              "interim_results": true
             }
           }
         },

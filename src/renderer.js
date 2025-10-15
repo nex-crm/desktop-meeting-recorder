@@ -30,6 +30,48 @@ function initializeLoginUI() {
   const otpStep = document.getElementById('otpStep');
   const emailSubmitBtn = document.getElementById('emailSubmitBtn');
   const otpSubmitBtn = document.getElementById('otpSubmitBtn');
+  const googleSignInBtn = document.getElementById('googleSignInBtn');
+
+  // Check if Google OAuth is available and show button
+  if (googleSignInBtn) {
+    window.electronAPI.auth.google.isAvailable().then(isAvailable => {
+      if (isAvailable) {
+        googleSignInBtn.style.display = 'flex';
+      }
+    });
+
+    // Handle Google sign-in button click
+    googleSignInBtn.addEventListener('click', async () => {
+      googleSignInBtn.disabled = true;
+      const originalText = googleSignInBtn.querySelector('span').textContent;
+      googleSignInBtn.querySelector('span').textContent = 'Signing in...';
+
+      try {
+        const result = await window.electronAPI.auth.google.authenticate();
+
+        if (result.success) {
+          // Successfully authenticated
+          loginView.style.display = 'none';
+          document.querySelector('.app-container').style.display = 'flex';
+
+          // Update auth status
+          if (window.updateAuthStatus) {
+            window.updateAuthStatus();
+          } else {
+            window.location.reload();
+          }
+        } else {
+          emailError.textContent = result.error || 'Google sign-in failed. Please try again.';
+        }
+      } catch (error) {
+        console.error('Google sign-in error:', error);
+        emailError.textContent = 'An error occurred with Google sign-in. Please try again.';
+      } finally {
+        googleSignInBtn.disabled = false;
+        googleSignInBtn.querySelector('span').textContent = originalText;
+      }
+    });
+  }
 
   // Handle email form submission
   if (emailForm) {

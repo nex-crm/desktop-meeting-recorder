@@ -127,6 +127,42 @@ class SecureStorage {
 
   clearAuth() {
     this.store.delete('auth');
+    this.clearGoogleTokens();
+  }
+
+  setGoogleTokens(tokens) {
+    const googleAuth = {
+      accessToken: this.encrypt(tokens.access_token),
+      refreshToken: this.encrypt(tokens.refresh_token),
+      idToken: tokens.id_token ? this.encrypt(tokens.id_token) : null,
+      expiresAt: tokens.expiry_date || (Date.now() + (tokens.expires_in * 1000)),
+      scope: tokens.scope,
+      tokenType: tokens.token_type,
+      updatedAt: Date.now(),
+    };
+
+    this.store.set('googleAuth', googleAuth);
+    return googleAuth;
+  }
+
+  getGoogleTokens() {
+    const googleAuth = this.store.get('googleAuth');
+    if (!googleAuth) return null;
+
+    return {
+      access_token: this.decrypt(googleAuth.accessToken),
+      refresh_token: this.decrypt(googleAuth.refreshToken),
+      id_token: googleAuth.idToken ? this.decrypt(googleAuth.idToken) : null,
+      expiry_date: googleAuth.expiresAt,
+      expires_in: Math.floor((googleAuth.expiresAt - Date.now()) / 1000),
+      scope: googleAuth.scope,
+      token_type: googleAuth.tokenType,
+      isExpired: this.isExpired(googleAuth.expiresAt),
+    };
+  }
+
+  clearGoogleTokens() {
+    this.store.delete('googleAuth');
   }
 
   getDeviceFingerprint() {

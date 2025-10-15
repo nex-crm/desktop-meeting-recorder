@@ -4,6 +4,7 @@ const axiosRetry = require('axios-retry');
 const SecureStorage = require('./storage');
 const constants = require('../config/constants');
 const { EventEmitter } = require('events');
+const GoogleOAuthService = require('./googleOAuth');
 
 class NexAuthService extends EventEmitter {
   constructor() {
@@ -12,6 +13,30 @@ class NexAuthService extends EventEmitter {
     this.apiClient = this.createApiClient();
     this.authWindow = null;
     this.refreshTimer = null;
+    this.googleOAuth = null;
+
+    // Initialize Google OAuth if credentials are available
+    this._initializeGoogleOAuth();
+  }
+
+  _initializeGoogleOAuth() {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+    if (clientId && clientSecret) {
+      try {
+        this.googleOAuth = new GoogleOAuthService(
+          clientId,
+          clientSecret,
+          process.env.GOOGLE_REDIRECT_URI
+        );
+        console.log('Google OAuth initialized successfully');
+      } catch (error) {
+        console.error('Failed to initialize Google OAuth:', error);
+      }
+    } else {
+      console.warn('Google OAuth credentials not found in environment variables');
+    }
   }
 
   createApiClient() {
@@ -143,6 +168,76 @@ class NexAuthService extends EventEmitter {
       }
       throw error;
     }
+  }
+
+  async authenticateWithGoogle() {
+    if (!this.googleOAuth) {
+      throw new Error('Google OAuth is not initialized. Please check your environment variables.');
+    }
+
+    console.log('Starting Google One Tap authentication...');
+    try {
+      // Authenticate with Google One Tap and get credential (ID token)
+      const { credential, userInfo } = await this.googleOAuth.authenticate();
+
+      console.log('Google authentication successful:', userInfo);
+
+      // Exchange Google ID token (credential) for Nex tokens
+      // The backend uses /v1/auth/idp endpoint with provider=1 for Google
+      const response = await this.apiClient.post('/v1/auth/idp', {
+        provider: 1, // 1 = Google (IntegrationProviderGoogle)
+        token: credential,
+      });
+
+      // Extract tokens from the response
+      const authData = response.data.auth || response.data.data?.auth || response.data;
+      const nexTokens = authData.tokens || [];
+
+      // Find tokens by type
+      const accessToken = nexTokens.find(t => t.type === 'TYPE_ACCESS' || t.type === 1)?.token;
+      const refreshToken = nexTokens.find(t => t.type === 'TYPE_REFRESH' || t.type === 2)?.token;
+
+      if (!accessToken || !refreshToken) {
+        throw new Error('Failed to obtain Nex tokens from Google authentication');
+      }
+
+      // Calculate expires_in
+      const accessTokenData = nexTokens.find(t => t.type === 'TYPE_ACCESS' || t.type === 1);
+      let expiresIn = 3600;
+      if (accessTokenData?.expiresAt) {
+        const expiryTime = new Date(accessTokenData.expiresAt).getTime();
+        const now = new Date().getTime();
+        expiresIn = Math.floor((expiryTime - now) / 1000);
+      }
+
+      // Store Nex tokens
+      this.storage.setTokens(accessToken, refreshToken, expiresIn);
+
+      const result = {
+        accessToken,
+        refreshToken,
+        expiresIn,
+        userInfo,
+      };
+
+      await this.fetchUserProfile();
+      await this.fetchAndStoreWorkspace();
+      this.setupTokenRefresh();
+      this.emit('auth:success');
+      return result;
+    } catch (error) {
+      console.error('Google authentication error:', error);
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+        console.error('Response headers:', error.response.headers);
+      }
+      throw error;
+    }
+  }
+
+  getGoogleOAuthService() {
+    return this.googleOAuth;
   }
 
   // This method is no longer needed for direct API auth
