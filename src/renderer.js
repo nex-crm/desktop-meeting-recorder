@@ -338,6 +338,20 @@ async function checkActiveRecordingState() {
   }
 }
 
+// Function to sync disclaimer visibility with record button
+function syncDisclaimerVisibility() {
+  const recordButton = document.getElementById('recordButton');
+  const disclaimer = document.getElementById('recordingDisclaimer');
+
+  if (!recordButton || !disclaimer) return;
+
+  // Show disclaimer when record button is visible
+  const isRecordButtonVisible = recordButton.style.display !== 'none' &&
+                                 window.getComputedStyle(recordButton).display !== 'none';
+
+  disclaimer.style.display = isRecordButtonVisible ? 'flex' : 'none';
+}
+
 // Function to update the recording button UI
 function updateRecordingButtonUI(isActive, recordingId) {
   const recordButton = document.getElementById('recordButton');
@@ -368,6 +382,9 @@ function updateRecordingButtonUI(isActive, recordingId) {
     recordIcon.style.display = 'block';
     stopIcon.style.display = 'none';
   }
+
+  // Sync disclaimer visibility
+  syncDisclaimerVisibility();
 }
 
 
@@ -380,6 +397,7 @@ window.setRecordButtonLoading = function(isLoading) {
   if (isLoading) {
     // Hide the record button
     recordButton.style.display = 'none';
+    syncDisclaimerVisibility();
 
     // Disable the generate button while loading
     if (generateBtn) {
@@ -412,6 +430,7 @@ window.setRecordButtonLoading = function(isLoading) {
   } else {
     // Show the record button
     recordButton.style.display = '';
+    syncDisclaimerVisibility();
 
     // Re-enable the generate button
     if (generateBtn) {
@@ -1672,11 +1691,13 @@ function showEditorView(meetingId, isFutureMeeting = false) {
           // Meeting ended more than 4 hours ago - hide record button, keep summarize button
           if (recordButton) {
             recordButton.style.display = 'none';
+            syncDisclaimerVisibility();
           }
         } else {
           // Meeting ended less than 4 hours ago - show record button
           if (recordButton) {
             recordButton.style.display = 'flex';
+            syncDisclaimerVisibility();
           }
           // Check if this note has an active recording and update the record button
           checkActiveRecordingState();
@@ -1763,6 +1784,9 @@ function setupTitleEditing() {
   // Add event listeners
   titleElement.addEventListener('blur', titleBlurHandler);
   titleElement.addEventListener('keydown', titleKeydownHandler);
+
+  // Ensure disclaimer visibility is synced with record button
+  syncDisclaimerVisibility();
 }
 
 // Event handler for title blur

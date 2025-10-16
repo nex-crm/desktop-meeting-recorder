@@ -1551,29 +1551,32 @@ body {
 /* Recording Disclaimer */
 .recording-disclaimer {
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  max-width: 600px;
-  padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  max-width: 800px;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 6px;
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.08);
   backdrop-filter: blur(10px);
-  margin-top: 4px;
+  margin-top: 8px;
 }
 
 .recording-disclaimer .disclaimer-icon {
   flex-shrink: 0;
-  margin-top: 2px;
   color: var(--color-system-warning-400, #f59e0b);
 }
 
-.recording-disclaimer p {
+.recording-disclaimer span {
   margin: 0;
-  font-size: 11px;
-  line-height: 1.5;
+  font-size: 10px;
+  line-height: 1.3;
   color: var(--color-neutral-600, #525252);
-  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Summary menu dropdown */
