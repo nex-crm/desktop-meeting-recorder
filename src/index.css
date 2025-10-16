@@ -159,8 +159,15 @@ body {
   margin-right: 8px;
 }
 
+.record-meeting-container {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+}
+
 .record-meeting-btn {
-  margin-right: 8px;
+  margin-right: 0;
   display: flex !important;
   flex-direction: row !important;
   align-items: center;
@@ -190,6 +197,57 @@ body {
   color: var(--color-neutral-400);
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+/* Recording Disclaimer Tooltip */
+.record-disclaimer-tooltip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  cursor: help;
+  margin-right: 8px;
+  -webkit-app-region: no-drag;
+}
+
+.record-disclaimer-tooltip .tooltip-icon {
+  color: var(--color-system-warning-400, #f59e0b);
+  transition: color 0.2s ease;
+}
+
+.record-disclaimer-tooltip:hover .tooltip-icon {
+  color: var(--color-system-warning-500, #d97706);
+}
+
+.record-disclaimer-tooltip .tooltip-content {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.record-disclaimer-tooltip .tooltip-content::after {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  right: 12px;
+  border: 6px solid transparent;
+  border-bottom-color: rgba(0, 0, 0, 0.9);
+}
+
+.record-disclaimer-tooltip:hover .tooltip-content {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 @keyframes pulse {
