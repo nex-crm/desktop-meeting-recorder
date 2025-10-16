@@ -1570,7 +1570,7 @@ function showEditorView(meetingId, isFutureMeeting = false) {
       } else {
         // If content is missing, create template
         const now = new Date();
-        const template = `# Meeting Title\n• ${meeting.title}\n\n# Meeting Date and Time\n• ${now.toLocaleString()}\n\n# Participants\n• \n\n# Description\n• \n\nChat with meeting transcript: `;
+        const template = `# Meeting Title\n• ${meeting.title}\n\n# Meeting Date and Time\n• ${now.toLocaleString()}\n\n# Participants\n• \n\n# Description\n• \n`;
         legacyEditorElement.value = template;
 
         // Save this template to the meeting
@@ -1869,7 +1869,7 @@ async function createNewMeeting() {
   const now = new Date();
 
   // Generate the template for the content
-  const template = `# Meeting Title\n• New Note\n\n# Meeting Date and Time\n• ${now.toLocaleString()}\n\n# Participants\n• \n\n# Description\n• \n\nChat with meeting transcript: `;
+  const template = `# Meeting Title\n• New Note\n\n# Meeting Date and Time\n• ${now.toLocaleString()}\n\n# Participants\n• \n\n# Description\n• \n`;
 
   // Create a new meeting object - ensure it's of type document
   const newMeeting = {

@@ -161,24 +161,28 @@ body {
 
 .record-meeting-btn {
   margin-right: 8px;
-  display: flex;
+  display: flex !important;
+  flex-direction: row !important;
   align-items: center;
   gap: 6px;
   transition: background-color 0.3s ease;
 }
 
 .record-meeting-btn.audio-mode {
-  background-color: var(--color-brand-primary-300); /* Blue for audio-only */
+  background-color: var(--color-neutral-950); /* Black for audio-only */
   color: white;
 }
 
 .record-meeting-btn.video-mode {
-  background-color: var(--color-system-success-300); /* Green for video recording */
+  background-color: var(--color-brand-primary-300); /* Blue for video recording */
   color: white;
 }
 
 .record-meeting-btn .btn-icon {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .record-meeting-btn:disabled {
