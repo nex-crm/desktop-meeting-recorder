@@ -1367,7 +1367,7 @@ function updateRecordButtonState() {
 function showHomeView() {
   document.getElementById('homeView').style.display = 'block';
   document.getElementById('editorView').style.display = 'none';
-  document.getElementById('backButton').style.display = 'none';
+  document.getElementById('backButton').style.visibility = 'hidden';
   document.getElementById('toggleSidebar').style.display = 'none';
 
   // Hide the meeting sidebar
@@ -1398,7 +1398,7 @@ function showEditorView(meetingId, isFutureMeeting = false) {
   // Make the views visible/hidden
   document.getElementById('homeView').style.display = 'none';
   document.getElementById('editorView').style.display = 'block';
-  document.getElementById('backButton').style.display = 'block';
+  document.getElementById('backButton').style.visibility = 'visible';
   document.getElementById('toggleSidebar').style.display = 'none'; // Hide the old sidebar toggle
 
   // Always hide the record meeting button when in editor view

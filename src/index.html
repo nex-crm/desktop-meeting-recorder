@@ -1,489 +1,572 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="UTF-8" />
-    <title>Muesli - Debug Notes</title>
-  </head>
-  <body>
-    <!-- Login View -->
-    <div id="loginView" class="login-container" style="display: none;">
-      <!-- Nex Logo at top -->
-      <svg class="nex-logo" width="83" height="24" viewBox="0 0 83 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M13.7962 10.1228C12.2807 8.60727 11.9862 6.26549 11.3832 4.20882C11.121 3.31464 10.6376 2.47211 9.93285 1.76732C7.68343 -0.482096 4.03077 -0.476468 1.77441 1.77989C-0.481951 4.03626 -0.487579 7.68891 1.76184 9.93833C2.46661 10.6431 3.30913 11.1265 4.20329 11.3887C6.25997 11.9917 8.60176 12.2862 10.1173 13.8017C11.6328 15.3172 11.9273 17.659 12.5303 19.7157C12.7925 20.6098 13.2759 21.4524 13.9806 22.1571C16.2301 24.4065 19.8827 24.4009 22.1391 22.1446C24.3954 19.8882 24.4011 16.2355 22.1516 13.9861C21.4469 13.2813 20.6043 12.7979 19.7102 12.5358C17.6535 11.9328 15.3117 11.6383 13.7962 10.1228Z" fill="#1a1a1a"/>
-        <path d="M8.71111 19.6444C8.71111 22.05 6.76106 24 4.35555 24C1.95005 24 0 22.05 0 19.6444C0 17.2389 1.95005 15.2889 4.35555 15.2889C6.76106 15.2889 8.71111 17.2389 8.71111 19.6444Z" fill="#1a1a1a"/>
-        <path d="M24 4.35555C24 6.76106 22.05 8.71111 19.6444 8.71111C17.2389 8.71111 15.2889 6.76106 15.2889 4.35555C15.2889 1.95005 17.2389 0 19.6444 0C22.05 0 24 1.95005 24 4.35555Z" fill="#1a1a1a"/>
-        <path d="M35.4253 7.77312V23.904H31.5V1.5H35.7497L44.9305 17.1828V1.5H48.8558V23.904H44.8981L35.4253 7.77312Z" fill="#1a1a1a"/>
-        <path d="M67.0544 16.6387H54.6944C55.1486 18.8151 56.9328 20.4154 59.0415 20.4154C60.6311 20.4154 62.026 19.5192 62.8046 18.143H66.73C65.6919 21.5356 62.6424 24 59.0415 24C54.5647 24 50.9637 20.1913 50.9637 15.5185C50.9637 10.8457 54.5647 7.03699 59.0415 7.03699C62.6424 7.03699 65.6919 9.50142 66.73 12.894C66.9895 13.7262 67.1192 14.5903 67.1192 15.5185C67.1192 15.9026 67.1192 16.2546 67.0544 16.6387ZM55.2784 12.894H62.8046C62.026 11.5178 60.6311 10.6216 59.0415 10.6216C57.4519 10.6216 56.0569 11.5178 55.2784 12.894Z" fill="#1a1a1a"/>
-        <path d="M82.5 6.78094L76.758 15.3585L82.5 23.904H77.9583L74.4871 18.7191L70.9835 23.904H66.4742L72.2163 15.3585L66.4742 6.78094H70.9835L74.4871 11.9659L77.9583 6.78094H82.5Z" fill="#1a1a1a"/>
-      </svg>
 
-      <div class="login-content">
-        <h1 class="login-title">Welcome to Nex</h1>
+<head>
+  <meta charset="UTF-8" />
+  <title>Muesli - Debug Notes</title>
+</head>
 
-        <!-- Email Step -->
-        <div id="emailStep" class="login-step">
-          <form id="emailForm" class="login-form">
-            <div class="form-group">
-              <input
-                type="email"
-                id="emailInput"
-                class="form-input"
-                placeholder="Email"
-                required
-                autocomplete="email"
-              />
-              <div class="form-error" id="emailError"></div>
-            </div>
-            <button type="submit" class="btn-primary" id="emailSubmitBtn">
-              Continue
-            </button>
-          </form>
+<body>
+  <!-- Login View -->
+  <div id="loginView" class="login-container" style="display: none;">
+    <!-- Nex Logo at top -->
+    <svg class="nex-logo" width="83" height="24" viewBox="0 0 83 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path
+        d="M13.7962 10.1228C12.2807 8.60727 11.9862 6.26549 11.3832 4.20882C11.121 3.31464 10.6376 2.47211 9.93285 1.76732C7.68343 -0.482096 4.03077 -0.476468 1.77441 1.77989C-0.481951 4.03626 -0.487579 7.68891 1.76184 9.93833C2.46661 10.6431 3.30913 11.1265 4.20329 11.3887C6.25997 11.9917 8.60176 12.2862 10.1173 13.8017C11.6328 15.3172 11.9273 17.659 12.5303 19.7157C12.7925 20.6098 13.2759 21.4524 13.9806 22.1571C16.2301 24.4065 19.8827 24.4009 22.1391 22.1446C24.3954 19.8882 24.4011 16.2355 22.1516 13.9861C21.4469 13.2813 20.6043 12.7979 19.7102 12.5358C17.6535 11.9328 15.3117 11.6383 13.7962 10.1228Z"
+        fill="#1a1a1a" />
+      <path
+        d="M8.71111 19.6444C8.71111 22.05 6.76106 24 4.35555 24C1.95005 24 0 22.05 0 19.6444C0 17.2389 1.95005 15.2889 4.35555 15.2889C6.76106 15.2889 8.71111 17.2389 8.71111 19.6444Z"
+        fill="#1a1a1a" />
+      <path
+        d="M24 4.35555C24 6.76106 22.05 8.71111 19.6444 8.71111C17.2389 8.71111 15.2889 6.76106 15.2889 4.35555C15.2889 1.95005 17.2389 0 19.6444 0C22.05 0 24 1.95005 24 4.35555Z"
+        fill="#1a1a1a" />
+      <path d="M35.4253 7.77312V23.904H31.5V1.5H35.7497L44.9305 17.1828V1.5H48.8558V23.904H44.8981L35.4253 7.77312Z"
+        fill="#1a1a1a" />
+      <path
+        d="M67.0544 16.6387H54.6944C55.1486 18.8151 56.9328 20.4154 59.0415 20.4154C60.6311 20.4154 62.026 19.5192 62.8046 18.143H66.73C65.6919 21.5356 62.6424 24 59.0415 24C54.5647 24 50.9637 20.1913 50.9637 15.5185C50.9637 10.8457 54.5647 7.03699 59.0415 7.03699C62.6424 7.03699 65.6919 9.50142 66.73 12.894C66.9895 13.7262 67.1192 14.5903 67.1192 15.5185C67.1192 15.9026 67.1192 16.2546 67.0544 16.6387ZM55.2784 12.894H62.8046C62.026 11.5178 60.6311 10.6216 59.0415 10.6216C57.4519 10.6216 56.0569 11.5178 55.2784 12.894Z"
+        fill="#1a1a1a" />
+      <path
+        d="M82.5 6.78094L76.758 15.3585L82.5 23.904H77.9583L74.4871 18.7191L70.9835 23.904H66.4742L72.2163 15.3585L66.4742 6.78094H70.9835L74.4871 11.9659L77.9583 6.78094H82.5Z"
+        fill="#1a1a1a" />
+    </svg>
 
-          <!-- Divider -->
-          <div class="login-divider">
-            <span class="divider-text">or</span>
+    <div class="login-content">
+      <h1 class="login-title">Welcome to Nex</h1>
+
+      <!-- Email Step -->
+      <div id="emailStep" class="login-step">
+        <form id="emailForm" class="login-form">
+          <div class="form-group">
+            <input type="email" id="emailInput" class="form-input" placeholder="Email" required autocomplete="email" />
+            <div class="form-error" id="emailError"></div>
           </div>
-
-          <!-- Google Sign-In Button -->
-          <button type="button" class="btn-google" id="googleSignInBtn" style="display: none;">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M17.64 9.20443C17.64 8.56625 17.5827 7.95262 17.4764 7.36353H9V10.8449H13.8436C13.635 11.9699 13.0009 12.9231 12.0477 13.5613V15.8194H14.9564C16.6582 14.2526 17.64 11.9453 17.64 9.20443Z" fill="#4285F4"/>
-              <path d="M8.99976 18C11.4298 18 13.467 17.1941 14.9561 15.8195L12.0475 13.5613C11.2416 14.1013 10.2107 14.4204 8.99976 14.4204C6.65567 14.4204 4.67158 12.8372 3.96385 10.71H0.957031V13.0418C2.43794 15.9831 5.48158 18 8.99976 18Z" fill="#34A853"/>
-              <path d="M3.96409 10.7099C3.78409 10.1699 3.68182 9.59356 3.68182 8.99992C3.68182 8.40628 3.78409 7.82992 3.96409 7.28992V4.95819H0.957273C0.347727 6.17356 0 7.54810 0 8.99992C0 10.4517 0.347727 11.8263 0.957273 13.0417L3.96409 10.7099Z" fill="#FBBC05"/>
-              <path d="M8.99976 3.57955C10.3211 3.57955 11.5075 4.03364 12.4402 4.92545L15.0216 2.34409C13.4629 0.891818 11.4257 0 8.99976 0C5.48158 0 2.43794 2.01682 0.957031 4.95818L3.96385 7.29C4.67158 5.16273 6.65567 3.57955 8.99976 3.57955Z" fill="#EA4335"/>
-            </svg>
-            <span>Continue with Google</span>
+          <button type="submit" class="btn-primary" id="emailSubmitBtn">
+            Continue
           </button>
+        </form>
+
+        <!-- Divider -->
+        <div class="login-divider">
+          <span class="divider-text">or</span>
         </div>
 
-        <!-- OTP Step -->
-        <div id="otpStep" class="login-step" style="display: none;">
-          <div class="otp-header">
-            <h2 class="otp-title">Enter a security code</h2>
-            <p class="otp-description">
-              We've sent you a security code to
-            </p>
-            <p class="user-email" id="userEmail"></p>
-          </div>
-
-          <form id="otpForm" class="login-form">
-            <div class="form-group">
-              <div class="otp-inputs" id="otpInputs">
-                <input type="text" class="otp-input" maxlength="1" data-index="0" />
-                <input type="text" class="otp-input" maxlength="1" data-index="1" />
-                <input type="text" class="otp-input" maxlength="1" data-index="2" />
-                <input type="text" class="otp-input" maxlength="1" data-index="3" />
-                <input type="text" class="otp-input" maxlength="1" data-index="4" />
-                <input type="text" class="otp-input" maxlength="1" data-index="5" />
-              </div>
-              <div class="form-error" id="otpError"></div>
-            </div>
-
-            <button type="submit" class="btn-primary" id="otpSubmitBtn">
-              Verify
-            </button>
-
-          </form>
-
-          <div class="otp-actions">
-            <button type="button" class="btn-link" id="resendCodeBtn">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" fill="currentColor"/>
-              </svg>
-              Resend code <span id="resendTimer"></span>
-            </button>
-            <button type="button" class="btn-link" id="backToEmailBtn">
-              Change email address
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="app-container">
-      <header class="header" id="drag-region">
-        <div class="header-left">
-          <button class="btn back-btn" id="backButton" style="display: none;">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M7.5 12L3 7.5L7.5 3M4 7.5L13 7.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-        </div>
-        <div class="header-center">
-          <div class="search-container">
-            <span class="search-icon">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M7.66667 13.6667C10.9804 13.6667 13.6667 10.9804 13.6667 7.66667C13.6667 4.35304 10.9804 1.66667 7.66667 1.66667C4.35304 1.66667 1.66667 4.35304 1.66667 7.66667C1.66667 10.9804 4.35304 13.6667 7.66667 13.6667Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M14.3333 14.3333L12.7333 12.7333" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </span>
-            <input type="text" class="search-input" placeholder="Search notes">
-          </div>
-        </div>
-        <div class="header-right">
-          <div class="record-meeting-container">
-            <button class="btn record-meeting-btn" id="recordMeetingBtn">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" class="btn-icon">
-                <path d="M8 10C9.10457 10 10 9.10457 10 8V3.5C10 2.39543 9.10457 1.5 8 1.5C6.89543 1.5 6 2.39543 6 3.5V8C6 9.10457 6.89543 10 8 10Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M12.5 7V8C12.5 10.4853 10.4853 12.5 8 12.5C5.51472 12.5 3.5 10.4853 3.5 8V7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M8 12.5V14.5M8 14.5H6M8 14.5H10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              <span>Record Meeting with Audio only</span>
-            </button>
-            <div class="record-disclaimer-tooltip">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="tooltip-icon">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" fill="currentColor"/>
-              </svg>
-              <div class="tooltip-content">By recording, you confirm consent from all participants and accept full legal liability for use of this tool.</div>
-            </div>
-          </div>
-          <button id="toggleSidebar" class="btn toggle-sidebar-btn" style="display: none;">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M2 4H14M2 8H14M2 12H14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-          <div class="user-avatar">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M13.3333 14V12.6667C13.3333 11.9594 13.0524 11.2811 12.5523 10.781C12.0522 10.281 11.3739 10 10.6667 10H5.33333C4.62609 10 3.94781 10.281 3.44772 10.781C2.94762 11.2811 2.66667 11.9594 2.66667 12.6667V14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M8 7.33333C9.47276 7.33333 10.6667 6.13943 10.6667 4.66667C10.6667 3.19391 9.47276 2 8 2C6.52724 2 5.33333 3.19391 5.33333 4.66667C5.33333 6.13943 6.52724 7.33333 8 7.33333Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </div>
-        </div>
-      </header>
-
-      <!-- Home Screen View -->
-      <div id="homeView">
-        <main class="main-content">
-          <div class="content-container">
-            <!-- Only showing notes section, calendar hidden -->
-            <section class="meetings-section">
-              <h2 class="section-title">Notes</h2>
-              <div class="meetings-list" id="notes-list">
-                <!-- Meeting cards will be inserted here by JavaScript -->
-              </div>
-            </section>
-          </div>
-        </main>
-      </div>
-
-      <!-- Note Editor View -->
-      <div id="editorView" style="display: none;">
-        <div class="note-container">
-          <main class="editor-content">
-            <div class="note-header">
-              <div class="title-container">
-                <h1 id="noteTitle" contenteditable="true">Paint shopping plan</h1>
-                <div class="edit-icon">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="#a0a0a0"/>
-                  </svg>
-                </div>
-              </div>
-              <div class="note-meta">
-                <span class="note-date">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M19 4H18V2H16V4H8V2H6V4H5C3.89 4 3.01 4.9 3.01 6L3 20C3 21.1 3.89 22 5 22H19C20.1 22 21 21.1 21 20V6C21 4.9 20.1 4 19 4ZM19 20H5V10H19V20ZM19 8H5V6H19V8ZM9 14H7V12H9V14ZM13 14H11V12H13V14ZM17 14H15V12H17V14ZM9 18H7V16H9V18ZM13 18H11V16H13V18ZM17 18H15V16H17V18Z" fill="#6947BD"/>
-                  </svg>
-                  <span id="noteDate">Apr 24</span>
-                </span>
-                <span id="noteParticipants" class="note-participants" style="display: none;"></span>
-              </div>
-            </div>
-
-            <!-- Collapsible Video Section -->
-            <div class="video-section collapsed" id="videoSection">
-              <div class="video-section-header" id="videoSectionToggle">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="collapse-icon">
-                  <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z" fill="currentColor"/>
-                </svg>
-                <span class="video-section-title">Meeting Recording</span>
-                <span class="video-section-duration" id="videoDuration"></span>
-              </div>
-              <div class="video-section-content" id="videoSectionContent">
-                <video id="meetingVideo" controls>
-                  <source id="videoSource" src="" type="video/webm">
-                  Your browser does not support the video tag.
-                </video>
-              </div>
-            </div>
-
-            <!-- Tabbed editor: Toggle between Personal Notes and AI Summary -->
-            <div class="tabbed-editor">
-              <!-- Personal Notes Tab Content -->
-              <div id="personal-notes-tab" class="editor-tab-content active">
-                <textarea id="personal-notes-editor" placeholder="Add your personal notes, action items, and key takeaways here..."></textarea>
-              </div>
-
-              <!-- AI Summary Tab Content -->
-              <div id="ai-summary-tab" class="editor-tab-content">
-                <textarea id="ai-summary-editor" placeholder="Click 'Summarize' button to generate an AI summary. You can edit the summary after it's generated."></textarea>
-              </div>
-            </div>
-          </main>
-
-          <aside class="sidebar" id="sidebar" style="display:none;">
-            <div class="sidebar-content">
-              <section class="sidebar-section">
-                <h3>SHARE NOTES</h3>
-                <div class="share-options">
-                  <button class="share-btn">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M3.9 12C3.9 10.29 5.29 8.9 7 8.9H11V7H7C4.24 7 2 9.24 2 12C2 14.76 4.24 17 7 17H11V15.1H7C5.29 15.1 3.9 13.71 3.9 12ZM8 13H16V11H8V13ZM17 7H13V8.9H17C18.71 8.9 20.1 10.29 20.1 12C20.1 13.71 18.71 15.1 17 15.1H13V17H17C19.76 17 22 14.76 22 12C22 9.24 19.76 7 17 7Z" fill="#666666"/>
-                    </svg>
-                    Copy link
-                  </button>
-                  <button class="share-btn">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M19 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3ZM19 19H5V5H19V19ZM7 10H9V17H7V10ZM11 7H13V17H11V7ZM15 13H17V17H15V13Z" fill="#666666"/>
-                    </svg>
-                    Copy text
-                  </button>
-                </div>
-
-                <div class="share-export">
-                  <button class="share-btn wide">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M20 4H4C2.9 4 2.01 4.9 2.01 6L2 18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6C22 4.9 21.1 4 20 4ZM20 18H4V8L12 13L20 8V18ZM12 11L4 6H20L12 11Z" fill="#666666"/>
-                    </svg>
-                    Email
-                  </button>
-                  <button class="share-btn wide">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M22 6C22 4.9 21.1 4 20 4H4C2.9 4 2 4.9 2 6V18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6ZM20 6L12 11L4 6H20ZM20 18H4V8L12 13L20 8V18Z" fill="#4285F4"/>
-                    </svg>
-                    Slack
-                  </button>
-                </div>
-              </section>
-
-              <section class="sidebar-section">
-                <h3>ASK MUESLI</h3>
-                <div class="ai-options">
-                  <button class="ai-btn">Generate meeting summary</button>
-                  <button class="ai-btn">List action items</button>
-                  <button class="ai-btn">Write follow-up email</button>
-                  <button class="ai-btn">List Q&A</button>
-                </div>
-              </section>
-            </div>
-          </aside>
-
-          <!-- Sidebar Toggle Button (outside sidebar) -->
-          <button class="sidebar-toggle-btn" id="sidebarToggleBtn" style="display: none;">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M15.41 7.41L14 6L8 12L14 18L15.41 16.59L10.83 12L15.41 7.41Z" fill="currentColor"/>
-            </svg>
-          </button>
-
-          <!-- Granola-style Sidebar -->
-          <aside class="meeting-sidebar collapsed" id="meetingSidebar" style="display: none;">
-            <div class="sidebar-content">
-              <section class="sidebar-section">
-                <h3 class="section-title">SHARE NOTES</h3>
-
-                <div class="share-buttons-list">
-                  <button class="share-btn-wide" id="copyTextBtn">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M16 1H4C2.9 1 2 1.9 2 3V17H4V3H16V1ZM19 5H8C6.9 5 6 5.9 6 7V21C6 22.1 6.9 23 8 23H19C20.1 23 21 22.1 21 21V7C21 5.9 20.1 5 19 5ZM19 21H8V7H19V21Z" fill="#999"/>
-                    </svg>
-                    <span>Copy text</span>
-                  </button>
-
-                  <button class="share-btn-wide" id="downloadTranscriptBtn" style="display: none;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M19 9H15V3H9V9H5L12 16L19 9ZM5 18V20H19V18H5Z" fill="#999"/>
-                    </svg>
-                    <span>Download transcript</span>
-                  </button>
-                </div>
-              </section>
-
-              <!-- Live Transcript Section -->
-              <section class="sidebar-section transcript-section">
-                <div class="transcript-header">
-                  <h3 class="section-title">LIVE TRANSCRIPT</h3>
-                </div>
-                <div class="transcript-chat" id="transcriptChat">
-                  <div class="transcript-placeholder">
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3z" fill="#999" opacity="0.5"/>
-                      <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" fill="#999" opacity="0.5"/>
-                    </svg>
-                    <p>Transcript will appear here when recording starts</p>
-                  </div>
-                </div>
-                <div class="transcript-footer">
-
-                </div>
-              </section>
-            </div>
-          </aside>
-        </div>
-
-        <div class="floating-controls">
-          <div class="control-buttons">
-            <!-- Tab switching buttons -->
-            <button class="control-btn tab-btn active" data-tab="personal-notes" title="My Notes">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor"/>
-              </svg>
-            </button>
-            <button class="control-btn tab-btn" data-tab="ai-summary" title="Summary">
-              <svg width="18" height="18" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M208,512a24.84,24.84,0,0,1-23.34-16l-39.84-103.6a16.06,16.06,0,0,0-9.19-9.19L32,343.34a25,25,0,0,1,0-46.68l103.6-39.84a16.06,16.06,0,0,0,9.19-9.19L184.66,144a25,25,0,0,1,46.68,0l39.84,103.6a16.06,16.06,0,0,0,9.19,9.19l103,39.63A25.49,25.49,0,0,1,400,320.52a24.82,24.82,0,0,1-16,22.82l-103.6,39.84a16.06,16.06,0,0,0-9.19,9.19L231.34,496A24.84,24.84,0,0,1,208,512Z" fill="currentColor"/>
-              </svg>
-            </button>
-
-            <!-- Divider -->
-            <div class="control-divider"></div>
-
-            <!-- Record button -->
-            <button class="control-btn record-btn" id="recordButton">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="record-icon">
-                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" fill="currentColor"/>
-                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" fill="currentColor"/>
-              </svg>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="stop-icon" style="display: none;">
-                <path d="M6 6h12v12H6V6z" fill="currentColor"/>
-              </svg>
-            </button>
-
-            <!-- Summarize button -->
-            <button class="control-btn generate-btn" id="generateBtn">
-              <svg width="16" height="16" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M208,512a24.84,24.84,0,0,1-23.34-16l-39.84-103.6a16.06,16.06,0,0,0-9.19-9.19L32,343.34a25,25,0,0,1,0-46.68l103.6-39.84a16.06,16.06,0,0,0,9.19-9.19L184.66,144a25,25,0,0,1,46.68,0l39.84,103.6a16.06,16.06,0,0,0,9.19,9.19l103,39.63A25.49,25.49,0,0,1,400,320.52a24.82,24.82,0,0,1-16,22.82l-103.6,39.84a16.06,16.06,0,0,0-9.19,9.19L231.34,496A24.84,24.84,0,0,1,208,512Z" fill="currentColor"/>
-                <path d="M88,176a14.67,14.67,0,0,1-13.69-9.4L57.45,122.76a7.28,7.28,0,0,0-4.21-4.21L9.4,101.69a14.67,14.67,0,0,1,0-27.38L53.24,57.45a7.31,7.31,0,0,0,4.21-4.21L74.16,9.79A15,15,0,0,1,86.23.11,14.67,14.67,0,0,1,101.69,9.4l16.86,43.84a7.31,7.31,0,0,0,4.21,4.21L166.6,74.31a14.67,14.67,0,0,1,0,27.38l-43.84,16.86a7.28,7.28,0,0,0-4.21,4.21L101.69,166.6A14.67,14.67,0,0,1,88,176Z" fill="currentColor"/>
-                <path d="M400,256a16,16,0,0,1-14.93-10.26l-22.84-59.37a8,8,0,0,0-4.6-4.6l-59.37-22.84a16,16,0,0,1,0-29.86l59.37-22.84a8,8,0,0,0,4.6-4.6L384.9,42.68a16.45,16.45,0,0,1,13.17-10.57,16,16,0,0,1,16.86,10.15l22.84,59.37a8,8,0,0,0,4.6,4.6l59.37,22.84a16,16,0,0,1,0,29.86l-59.37,22.84a8,8,0,0,0-4.6,4.6l-22.84,59.37A16,16,0,0,1,400,256Z" fill="currentColor"/>
-              </svg>
-            </button>
-
-          </div>
-
-          <!-- Recording Disclaimer -->
-          <div class="recording-disclaimer" id="recordingDisclaimer" style="display: none;">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="disclaimer-icon">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" fill="currentColor"/>
-            </svg>
-            <span>By recording, you confirm consent from all participants and accept full legal liability for use of this tool.</span>
-          </div>
-        </div>
-
-        <div class="chat-input-container">
-          <div class="chat-input">
-            <input type="text" id="chatInput" placeholder="Ask about the meeting..." style="display: none;" />
-            <button id="sendButton" style="display: none;">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M2.01 21L23 12L2.01 3L2 10L17 12L2 14L2.01 21Z" fill="#0077FF"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Debug Panel -->
-    <div class="debug-panel hidden" id="debugPanel">
-      <div class="debug-panel-header" id="debug-drag-region">
-        <h3>Debugging Tools</h3>
-        <button class="debug-panel-close" id="closeDebugPanelBtn">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" fill="currentColor"/>
+        <!-- Google Sign-In Button -->
+        <button type="button" class="btn-google" id="googleSignInBtn" style="display: none;">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M17.64 9.20443C17.64 8.56625 17.5827 7.95262 17.4764 7.36353H9V10.8449H13.8436C13.635 11.9699 13.0009 12.9231 12.0477 13.5613V15.8194H14.9564C16.6582 14.2526 17.64 11.9453 17.64 9.20443Z"
+              fill="#4285F4" />
+            <path
+              d="M8.99976 18C11.4298 18 13.467 17.1941 14.9561 15.8195L12.0475 13.5613C11.2416 14.1013 10.2107 14.4204 8.99976 14.4204C6.65567 14.4204 4.67158 12.8372 3.96385 10.71H0.957031V13.0418C2.43794 15.9831 5.48158 18 8.99976 18Z"
+              fill="#34A853" />
+            <path
+              d="M3.96409 10.7099C3.78409 10.1699 3.68182 9.59356 3.68182 8.99992C3.68182 8.40628 3.78409 7.82992 3.96409 7.28992V4.95819H0.957273C0.347727 6.17356 0 7.54810 0 8.99992C0 10.4517 0.347727 11.8263 0.957273 13.0417L3.96409 10.7099Z"
+              fill="#FBBC05" />
+            <path
+              d="M8.99976 3.57955C10.3211 3.57955 11.5075 4.03364 12.4402 4.92545L15.0216 2.34409C13.4629 0.891818 11.4257 0 8.99976 0C5.48158 0 2.43794 2.01682 0.957031 4.95818L3.96385 7.29C4.67158 5.16273 6.65567 3.57955 8.99976 3.57955Z"
+              fill="#EA4335" />
           </svg>
+          <span>Continue with Google</span>
         </button>
       </div>
 
-      <div class="debug-panel-content">
-        <!-- Notification Test Section -->
-        <div class="debug-section" id="notificationTestSection">
-          <div class="debug-section-header">
-            <h4>Notification Testing</h4>
+      <!-- OTP Step -->
+      <div id="otpStep" class="login-step" style="display: none;">
+        <div class="otp-header">
+          <h2 class="otp-title">Enter a security code</h2>
+          <p class="otp-description">
+            We've sent you a security code to
+          </p>
+          <p class="user-email" id="userEmail"></p>
+        </div>
+
+        <form id="otpForm" class="login-form">
+          <div class="form-group">
+            <div class="otp-inputs" id="otpInputs">
+              <input type="text" class="otp-input" maxlength="1" data-index="0" />
+              <input type="text" class="otp-input" maxlength="1" data-index="1" />
+              <input type="text" class="otp-input" maxlength="1" data-index="2" />
+              <input type="text" class="otp-input" maxlength="1" data-index="3" />
+              <input type="text" class="otp-input" maxlength="1" data-index="4" />
+              <input type="text" class="otp-input" maxlength="1" data-index="5" />
+            </div>
+            <div class="form-error" id="otpError"></div>
           </div>
-          <div class="debug-section-content">
-            <div style="padding: 10px;">
-              <button id="testSystemNotifBtn" style="margin: 5px; padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                Test System Notification
-              </button>
-              <button id="testInAppNotifBtn" style="margin: 5px; padding: 8px 16px; background: #6947BD; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                Test In-App Notification
-              </button>
-              <div id="notifTestResult" style="margin-top: 10px; padding: 10px; background: #f0f0f0; border-radius: 4px; font-size: 12px; max-height: 100px; overflow-y: auto;">
-                Click a button to test notifications...
+
+          <button type="submit" class="btn-primary" id="otpSubmitBtn">
+            Verify
+          </button>
+
+        </form>
+
+        <div class="otp-actions">
+          <button type="button" class="btn-link" id="resendCodeBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"
+                fill="currentColor" />
+            </svg>
+            Resend code <span id="resendTimer"></span>
+          </button>
+          <button type="button" class="btn-link" id="backToEmailBtn">
+            Change email address
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="app-container">
+    <header class="header" id="drag-region">
+      <div class="header-left">
+        <button class="btn back-btn" id="backButton" style="visibility: hidden;">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M7.5 12L3 7.5L7.5 3M4 7.5L13 7.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"
+              stroke-linejoin="round" />
+          </svg>
+        </button>
+      </div>
+      <div class="header-center">
+        <div class="search-container">
+          <span class="search-icon">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M7.66667 13.6667C10.9804 13.6667 13.6667 10.9804 13.6667 7.66667C13.6667 4.35304 10.9804 1.66667 7.66667 1.66667C4.35304 1.66667 1.66667 4.35304 1.66667 7.66667C1.66667 10.9804 4.35304 13.6667 7.66667 13.6667Z"
+                stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M14.3333 14.3333L12.7333 12.7333" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"
+                stroke-linejoin="round" />
+            </svg>
+          </span>
+          <input type="text" class="search-input" placeholder="Search notes">
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="record-meeting-container">
+          <button class="btn record-meeting-btn" id="recordMeetingBtn">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"
+              class="btn-icon">
+              <path
+                d="M8 10C9.10457 10 10 9.10457 10 8V3.5C10 2.39543 9.10457 1.5 8 1.5C6.89543 1.5 6 2.39543 6 3.5V8C6 9.10457 6.89543 10 8 10Z"
+                stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M12.5 7V8C12.5 10.4853 10.4853 12.5 8 12.5C5.51472 12.5 3.5 10.4853 3.5 8V7"
+                stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M8 12.5V14.5M8 14.5H6M8 14.5H10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"
+                stroke-linejoin="round" />
+            </svg>
+            <span>Record Meeting with Audio only</span>
+          </button>
+          <div class="record-disclaimer-tooltip">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+              class="tooltip-icon">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"
+                fill="currentColor" />
+            </svg>
+            <div class="tooltip-content">By recording, you confirm consent from all participants and accept full legal
+              liability for use of this tool.</div>
+          </div>
+        </div>
+        <button id="toggleSidebar" class="btn toggle-sidebar-btn" style="display: none;">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M2 4H14M2 8H14M2 12H14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"
+              stroke-linejoin="round" />
+          </svg>
+        </button>
+        <div class="user-avatar">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M13.3333 14V12.6667C13.3333 11.9594 13.0524 11.2811 12.5523 10.781C12.0522 10.281 11.3739 10 10.6667 10H5.33333C4.62609 10 3.94781 10.281 3.44772 10.781C2.94762 11.2811 2.66667 11.9594 2.66667 12.6667V14"
+              stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+            <path
+              d="M8 7.33333C9.47276 7.33333 10.6667 6.13943 10.6667 4.66667C10.6667 3.19391 9.47276 2 8 2C6.52724 2 5.33333 3.19391 5.33333 4.66667C5.33333 6.13943 6.52724 7.33333 8 7.33333Z"
+              stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </div>
+      </div>
+    </header>
+
+    <!-- Home Screen View -->
+    <div id="homeView">
+      <main class="main-content">
+        <div class="content-container">
+          <!-- Only showing notes section, calendar hidden -->
+          <section class="meetings-section">
+            <h2 class="section-title">Notes</h2>
+            <div class="meetings-list" id="notes-list">
+              <!-- Meeting cards will be inserted here by JavaScript -->
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <!-- Note Editor View -->
+    <div id="editorView" style="display: none;">
+      <div class="note-container">
+        <main class="editor-content">
+          <div class="note-header">
+            <div class="title-container">
+              <h1 id="noteTitle" contenteditable="true">Paint shopping plan</h1>
+              <div class="edit-icon">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
+                    fill="#a0a0a0" />
+                </svg>
               </div>
             </div>
-          </div>
-        </div>
-
-        <!-- SDK Logger Section -->
-        <div class="debug-section" id="loggerSection">
-          <div class="debug-section-header">
-            <h4>RecallAI SDK Logger</h4>
-            <button class="debug-section-action" id="clearLoggerBtn">Clear</button>
-          </div>
-          <div class="debug-section-content" id="sdkLoggerContent">
-            <!-- Log entries will be added here dynamically -->
-          </div>
-        </div>
-
-        <!-- Transcript Section -->
-        <div class="debug-section" id="transcriptSection">
-          <div class="debug-section-header">
-            <h4>Transcript</h4>
-          </div>
-          <div class="debug-section-content" id="transcriptContent">
-            <div class="placeholder-content">
-              <p>Live transcript will appear here during recording</p>
+            <div class="note-meta">
+              <span class="note-date">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M19 4H18V2H16V4H8V2H6V4H5C3.89 4 3.01 4.9 3.01 6L3 20C3 21.1 3.89 22 5 22H19C20.1 22 21 21.1 21 20V6C21 4.9 20.1 4 19 4ZM19 20H5V10H19V20ZM19 8H5V6H19V8ZM9 14H7V12H9V14ZM13 14H11V12H13V14ZM17 14H15V12H17V14ZM9 18H7V16H9V18ZM13 18H11V16H13V18ZM17 18H15V16H17V18Z"
+                    fill="#6947BD" />
+                </svg>
+                <span id="noteDate">Apr 24</span>
+              </span>
+              <span id="noteParticipants" class="note-participants" style="display: none;"></span>
             </div>
           </div>
-        </div>
 
-        <!-- Participants Section -->
-        <div class="debug-section" id="participantsSection">
-          <div class="debug-section-header">
-            <h4>Meeting Participants</h4>
-          </div>
-          <div class="debug-section-content" id="participantsContent">
-            <div class="placeholder-content">
-              <p>Detected participants will appear here</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Participant Video Debug Section -->
-        <div class="debug-section" id="videoSection">
-          <div class="debug-section-header">
-            <h4>Participant Video</h4>
-          </div>
-          <div class="debug-section-content" id="videoContent">
-            <div class="placeholder-content video-placeholder">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" fill="#999"/>
+          <!-- Collapsible Video Section -->
+          <div class="video-section collapsed" id="videoSection">
+            <div class="video-section-header" id="videoSectionToggle">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+                class="collapse-icon">
+                <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z" fill="currentColor" />
               </svg>
-              <p>Participant video will appear here</p>
+              <span class="video-section-title">Meeting Recording</span>
+              <span class="video-section-duration" id="videoDuration"></span>
+            </div>
+            <div class="video-section-content" id="videoSectionContent">
+              <video id="meetingVideo" controls>
+                <source id="videoSource" src="" type="video/webm">
+                Your browser does not support the video tag.
+              </video>
             </div>
           </div>
+
+          <!-- Tabbed editor: Toggle between Personal Notes and AI Summary -->
+          <div class="tabbed-editor">
+            <!-- Personal Notes Tab Content -->
+            <div id="personal-notes-tab" class="editor-tab-content active">
+              <textarea id="personal-notes-editor"
+                placeholder="Add your personal notes, action items, and key takeaways here..."></textarea>
+            </div>
+
+            <!-- AI Summary Tab Content -->
+            <div id="ai-summary-tab" class="editor-tab-content">
+              <textarea id="ai-summary-editor"
+                placeholder="Click 'Summarize' button to generate an AI summary. You can edit the summary after it's generated."></textarea>
+            </div>
+          </div>
+        </main>
+
+        <aside class="sidebar" id="sidebar" style="display:none;">
+          <div class="sidebar-content">
+            <section class="sidebar-section">
+              <h3>SHARE NOTES</h3>
+              <div class="share-options">
+                <button class="share-btn">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                      d="M3.9 12C3.9 10.29 5.29 8.9 7 8.9H11V7H7C4.24 7 2 9.24 2 12C2 14.76 4.24 17 7 17H11V15.1H7C5.29 15.1 3.9 13.71 3.9 12ZM8 13H16V11H8V13ZM17 7H13V8.9H17C18.71 8.9 20.1 10.29 20.1 12C20.1 13.71 18.71 15.1 17 15.1H13V17H17C19.76 17 22 14.76 22 12C22 9.24 19.76 7 17 7Z"
+                      fill="#666666" />
+                  </svg>
+                  Copy link
+                </button>
+                <button class="share-btn">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                      d="M19 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3ZM19 19H5V5H19V19ZM7 10H9V17H7V10ZM11 7H13V17H11V7ZM15 13H17V17H15V13Z"
+                      fill="#666666" />
+                  </svg>
+                  Copy text
+                </button>
+              </div>
+
+              <div class="share-export">
+                <button class="share-btn wide">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                      d="M20 4H4C2.9 4 2.01 4.9 2.01 6L2 18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6C22 4.9 21.1 4 20 4ZM20 18H4V8L12 13L20 8V18ZM12 11L4 6H20L12 11Z"
+                      fill="#666666" />
+                  </svg>
+                  Email
+                </button>
+                <button class="share-btn wide">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                      d="M22 6C22 4.9 21.1 4 20 4H4C2.9 4 2 4.9 2 6V18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6ZM20 6L12 11L4 6H20ZM20 18H4V8L12 13L20 8V18Z"
+                      fill="#4285F4" />
+                  </svg>
+                  Slack
+                </button>
+              </div>
+            </section>
+
+            <section class="sidebar-section">
+              <h3>ASK MUESLI</h3>
+              <div class="ai-options">
+                <button class="ai-btn">Generate meeting summary</button>
+                <button class="ai-btn">List action items</button>
+                <button class="ai-btn">Write follow-up email</button>
+                <button class="ai-btn">List Q&A</button>
+              </div>
+            </section>
+          </div>
+        </aside>
+
+        <!-- Sidebar Toggle Button (outside sidebar) -->
+        <button class="sidebar-toggle-btn" id="sidebarToggleBtn" style="display: none;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M15.41 7.41L14 6L8 12L14 18L15.41 16.59L10.83 12L15.41 7.41Z" fill="currentColor" />
+          </svg>
+        </button>
+
+        <!-- Granola-style Sidebar -->
+        <aside class="meeting-sidebar collapsed" id="meetingSidebar" style="display: none;">
+          <div class="sidebar-content">
+            <section class="sidebar-section">
+              <h3 class="section-title">SHARE NOTES</h3>
+
+              <div class="share-buttons-list">
+                <button class="share-btn-wide" id="copyTextBtn">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                      d="M16 1H4C2.9 1 2 1.9 2 3V17H4V3H16V1ZM19 5H8C6.9 5 6 5.9 6 7V21C6 22.1 6.9 23 8 23H19C20.1 23 21 22.1 21 21V7C21 5.9 20.1 5 19 5ZM19 21H8V7H19V21Z"
+                      fill="#999" />
+                  </svg>
+                  <span>Copy text</span>
+                </button>
+
+                <button class="share-btn-wide" id="downloadTranscriptBtn" style="display: none;">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M19 9H15V3H9V9H5L12 16L19 9ZM5 18V20H19V18H5Z" fill="#999" />
+                  </svg>
+                  <span>Download transcript</span>
+                </button>
+              </div>
+            </section>
+
+            <!-- Live Transcript Section -->
+            <section class="sidebar-section transcript-section">
+              <div class="transcript-header">
+                <h3 class="section-title">LIVE TRANSCRIPT</h3>
+              </div>
+              <div class="transcript-chat" id="transcriptChat">
+                <div class="transcript-placeholder">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3z" fill="#999"
+                      opacity="0.5" />
+                    <path
+                      d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"
+                      fill="#999" opacity="0.5" />
+                  </svg>
+                  <p>Transcript will appear here when recording starts</p>
+                </div>
+              </div>
+              <div class="transcript-footer">
+
+              </div>
+            </section>
+          </div>
+        </aside>
+      </div>
+
+      <div class="floating-controls">
+        <div class="control-buttons">
+          <!-- Tab switching buttons -->
+          <button class="control-btn tab-btn active" data-tab="personal-notes" title="My Notes">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
+                fill="currentColor" />
+            </svg>
+          </button>
+          <button class="control-btn tab-btn" data-tab="ai-summary" title="Summary">
+            <svg width="18" height="18" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M208,512a24.84,24.84,0,0,1-23.34-16l-39.84-103.6a16.06,16.06,0,0,0-9.19-9.19L32,343.34a25,25,0,0,1,0-46.68l103.6-39.84a16.06,16.06,0,0,0,9.19-9.19L184.66,144a25,25,0,0,1,46.68,0l39.84,103.6a16.06,16.06,0,0,0,9.19,9.19l103,39.63A25.49,25.49,0,0,1,400,320.52a24.82,24.82,0,0,1-16,22.82l-103.6,39.84a16.06,16.06,0,0,0-9.19,9.19L231.34,496A24.84,24.84,0,0,1,208,512Z"
+                fill="currentColor" />
+            </svg>
+          </button>
+
+          <!-- Divider -->
+          <div class="control-divider"></div>
+
+          <!-- Record button -->
+          <button class="control-btn record-btn" id="recordButton">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+              class="record-icon">
+              <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"
+                fill="currentColor" />
+              <path
+                d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"
+                fill="currentColor" />
+            </svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+              class="stop-icon" style="display: none;">
+              <path d="M6 6h12v12H6V6z" fill="currentColor" />
+            </svg>
+          </button>
+
+          <!-- Summarize button -->
+          <button class="control-btn generate-btn" id="generateBtn">
+            <svg width="16" height="16" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M208,512a24.84,24.84,0,0,1-23.34-16l-39.84-103.6a16.06,16.06,0,0,0-9.19-9.19L32,343.34a25,25,0,0,1,0-46.68l103.6-39.84a16.06,16.06,0,0,0,9.19-9.19L184.66,144a25,25,0,0,1,46.68,0l39.84,103.6a16.06,16.06,0,0,0,9.19,9.19l103,39.63A25.49,25.49,0,0,1,400,320.52a24.82,24.82,0,0,1-16,22.82l-103.6,39.84a16.06,16.06,0,0,0-9.19,9.19L231.34,496A24.84,24.84,0,0,1,208,512Z"
+                fill="currentColor" />
+              <path
+                d="M88,176a14.67,14.67,0,0,1-13.69-9.4L57.45,122.76a7.28,7.28,0,0,0-4.21-4.21L9.4,101.69a14.67,14.67,0,0,1,0-27.38L53.24,57.45a7.31,7.31,0,0,0,4.21-4.21L74.16,9.79A15,15,0,0,1,86.23.11,14.67,14.67,0,0,1,101.69,9.4l16.86,43.84a7.31,7.31,0,0,0,4.21,4.21L166.6,74.31a14.67,14.67,0,0,1,0,27.38l-43.84,16.86a7.28,7.28,0,0,0-4.21,4.21L101.69,166.6A14.67,14.67,0,0,1,88,176Z"
+                fill="currentColor" />
+              <path
+                d="M400,256a16,16,0,0,1-14.93-10.26l-22.84-59.37a8,8,0,0,0-4.6-4.6l-59.37-22.84a16,16,0,0,1,0-29.86l59.37-22.84a8,8,0,0,0,4.6-4.6L384.9,42.68a16.45,16.45,0,0,1,13.17-10.57,16,16,0,0,1,16.86,10.15l22.84,59.37a8,8,0,0,0,4.6,4.6l59.37,22.84a16,16,0,0,1,0,29.86l-59.37,22.84a8,8,0,0,0-4.6,4.6l-22.84,59.37A16,16,0,0,1,400,256Z"
+                fill="currentColor" />
+            </svg>
+          </button>
+
         </div>
 
-        <!-- Screenshare Video Debug Section -->
-        <div class="debug-section" id="screenshareSection">
-          <div class="debug-section-header">
-            <h4>Screenshare</h4>
-          </div>
-          <div class="debug-section-content" id="screenshareContent">
-            <div class="placeholder-content video-placeholder">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z" fill="#999"/>
-              </svg>
-              <p>Screenshare will appear here</p>
+        <!-- Recording Disclaimer -->
+        <div class="recording-disclaimer" id="recordingDisclaimer" style="display: none;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+            class="disclaimer-icon">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"
+              fill="currentColor" />
+          </svg>
+          <span>By recording, you confirm consent from all participants and accept full legal liability for use of this
+            tool.</span>
+        </div>
+      </div>
+
+      <div class="chat-input-container">
+        <div class="chat-input">
+          <input type="text" id="chatInput" placeholder="Ask about the meeting..." style="display: none;" />
+          <button id="sendButton" style="display: none;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M2.01 21L23 12L2.01 3L2 10L17 12L2 14L2.01 21Z" fill="#0077FF" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Debug Panel -->
+  <div class="debug-panel hidden" id="debugPanel">
+    <div class="debug-panel-header" id="debug-drag-region">
+      <h3>Debugging Tools</h3>
+      <button class="debug-panel-close" id="closeDebugPanelBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path
+            d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+            fill="currentColor" />
+        </svg>
+      </button>
+    </div>
+
+    <div class="debug-panel-content">
+      <!-- Notification Test Section -->
+      <div class="debug-section" id="notificationTestSection">
+        <div class="debug-section-header">
+          <h4>Notification Testing</h4>
+        </div>
+        <div class="debug-section-content">
+          <div style="padding: 10px;">
+            <button id="testSystemNotifBtn"
+              style="margin: 5px; padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">
+              Test System Notification
+            </button>
+            <button id="testInAppNotifBtn"
+              style="margin: 5px; padding: 8px 16px; background: #6947BD; color: white; border: none; border-radius: 4px; cursor: pointer;">
+              Test In-App Notification
+            </button>
+            <div id="notifTestResult"
+              style="margin-top: 10px; padding: 10px; background: #f0f0f0; border-radius: 4px; font-size: 12px; max-height: 100px; overflow-y: auto;">
+              Click a button to test notifications...
             </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <button class="debug-panel-toggle panel-hidden" id="debugPanelToggle">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M20 8h-2.81c-.45-.78-1.07-1.45-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5c-.49 0-.96.06-1.41.17L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8zm-6 8h-4v-2h4v2zm0-4h-4v-2h4v2z" fill="currentColor"/>
-      </svg>
-    </button>
-  </body>
+      <!-- SDK Logger Section -->
+      <div class="debug-section" id="loggerSection">
+        <div class="debug-section-header">
+          <h4>RecallAI SDK Logger</h4>
+          <button class="debug-section-action" id="clearLoggerBtn">Clear</button>
+        </div>
+        <div class="debug-section-content" id="sdkLoggerContent">
+          <!-- Log entries will be added here dynamically -->
+        </div>
+      </div>
+
+      <!-- Transcript Section -->
+      <div class="debug-section" id="transcriptSection">
+        <div class="debug-section-header">
+          <h4>Transcript</h4>
+        </div>
+        <div class="debug-section-content" id="transcriptContent">
+          <div class="placeholder-content">
+            <p>Live transcript will appear here during recording</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Participants Section -->
+      <div class="debug-section" id="participantsSection">
+        <div class="debug-section-header">
+          <h4>Meeting Participants</h4>
+        </div>
+        <div class="debug-section-content" id="participantsContent">
+          <div class="placeholder-content">
+            <p>Detected participants will appear here</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Participant Video Debug Section -->
+      <div class="debug-section" id="videoSection">
+        <div class="debug-section-header">
+          <h4>Participant Video</h4>
+        </div>
+        <div class="debug-section-content" id="videoContent">
+          <div class="placeholder-content video-placeholder">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"
+                fill="#999" />
+            </svg>
+            <p>Participant video will appear here</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Screenshare Video Debug Section -->
+      <div class="debug-section" id="screenshareSection">
+        <div class="debug-section-header">
+          <h4>Screenshare</h4>
+        </div>
+        <div class="debug-section-content" id="screenshareContent">
+          <div class="placeholder-content video-placeholder">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"
+                fill="#999" />
+            </svg>
+            <p>Screenshare will appear here</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button class="debug-panel-toggle panel-hidden" id="debugPanelToggle">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path
+        d="M20 8h-2.81c-.45-.78-1.07-1.45-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5c-.49 0-.96.06-1.41.17L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8zm-6 8h-4v-2h4v2zm0-4h-4v-2h4v2z"
+        fill="currentColor" />
+    </svg>
+  </button>
+</body>
+
 </html>
