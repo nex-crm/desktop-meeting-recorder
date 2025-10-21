@@ -1,0 +1,12 @@
+{
+	"javascript": {
+		"formatter": {
+			"indentStyle": "space",
+			"quoteStyle": "single",
+			"jsxQuoteStyle": "single"
+		},
+		"parser": {
+			"jsxEverywhere": false
+		}
+	}
+}

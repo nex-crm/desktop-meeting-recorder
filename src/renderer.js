@@ -34,7 +34,7 @@ function initializeLoginUI() {
 
   // Check if Google OAuth is available and show button
   if (googleSignInBtn) {
-    window.electronAPI.auth.google.isAvailable().then(isAvailable => {
+    window.electronAPI.auth.google.isAvailable().then((isAvailable) => {
       if (isAvailable) {
         googleSignInBtn.style.display = 'flex';
       }
@@ -61,11 +61,13 @@ function initializeLoginUI() {
             window.location.reload();
           }
         } else {
-          emailError.textContent = result.error || 'Google sign-in failed. Please try again.';
+          emailError.textContent =
+            result.error || 'Google sign-in failed. Please try again.';
         }
       } catch (error) {
         console.error('Google sign-in error:', error);
-        emailError.textContent = 'An error occurred with Google sign-in. Please try again.';
+        emailError.textContent =
+          'An error occurred with Google sign-in. Please try again.';
       } finally {
         googleSignInBtn.disabled = false;
         googleSignInBtn.querySelector('span').textContent = originalText;
@@ -100,7 +102,8 @@ function initializeLoginUI() {
           // Start resend timer
           startResendTimer();
         } else {
-          emailError.textContent = result.error || 'Failed to send verification email';
+          emailError.textContent =
+            result.error || 'Failed to send verification email';
         }
       } catch (error) {
         console.error('Email auth error:', error);
@@ -166,7 +169,9 @@ function initializeLoginUI() {
 
   async function handleOTPSubmit() {
     otpError.textContent = '';
-    const otp = Array.from(otpInputs).map(input => input.value).join('');
+    const otp = Array.from(otpInputs)
+      .map((input) => input.value)
+      .join('');
 
     if (otp.length !== 6) {
       otpError.textContent = 'Please enter all 6 digits';
@@ -177,7 +182,10 @@ function initializeLoginUI() {
     otpSubmitBtn.textContent = 'Verifying...';
 
     try {
-      const result = await window.electronAPI.auth.submitOTP(currentAttemptId, otp);
+      const result = await window.electronAPI.auth.submitOTP(
+        currentAttemptId,
+        otp,
+      );
 
       if (result.success) {
         // Successfully authenticated
@@ -185,7 +193,7 @@ function initializeLoginUI() {
         document.querySelector('.app-container').style.display = 'flex';
 
         // Clear OTP inputs
-        otpInputs.forEach(input => {
+        otpInputs.forEach((input) => {
           input.value = '';
           input.classList.remove('filled');
         });
@@ -198,10 +206,11 @@ function initializeLoginUI() {
           window.location.reload();
         }
       } else {
-        otpError.textContent = result.error || 'Invalid code. Please try again.';
+        otpError.textContent =
+          result.error || 'Invalid code. Please try again.';
 
         // Clear OTP inputs on error
-        otpInputs.forEach(input => {
+        otpInputs.forEach((input) => {
           input.value = '';
           input.classList.remove('filled');
         });
@@ -220,7 +229,7 @@ function initializeLoginUI() {
   if (backToEmailBtn) {
     backToEmailBtn.addEventListener('click', () => {
       // Clear OTP inputs
-      otpInputs.forEach(input => {
+      otpInputs.forEach((input) => {
         input.value = '';
         input.classList.remove('filled');
       });
@@ -254,7 +263,7 @@ function initializeLoginUI() {
           currentAttemptId = result.data.attempt?.id;
 
           // Clear OTP inputs
-          otpInputs.forEach(input => {
+          otpInputs.forEach((input) => {
             input.value = '';
             input.classList.remove('filled');
           });
@@ -303,7 +312,7 @@ function initializeLoginUI() {
 // Create empty meetings data structure to be filled from the file
 const meetingsData = {
   upcomingMeetings: [],
-  pastMeetings: []
+  pastMeetings: [],
 };
 
 // Create empty arrays that will be filled from file
@@ -317,14 +326,18 @@ let pastMeetingsByDate = {};
 window.isRecording = false;
 window.currentRecordingId = null;
 
-
 // Function to check if there's an active recording for the current note
 async function checkActiveRecordingState() {
   if (!currentEditingMeetingId) return;
 
   try {
-    console.log('Checking active recording state for note:', currentEditingMeetingId);
-    const result = await window.electronAPI.getActiveRecordingId(currentEditingMeetingId);
+    console.log(
+      'Checking active recording state for note:',
+      currentEditingMeetingId,
+    );
+    const result = await window.electronAPI.getActiveRecordingId(
+      currentEditingMeetingId,
+    );
 
     if (result.success && result.data) {
       console.log('Found active recording for current note:', result.data);
@@ -346,8 +359,9 @@ function syncDisclaimerVisibility() {
   if (!recordButton || !disclaimer) return;
 
   // Show disclaimer when record button is visible
-  const isRecordButtonVisible = recordButton.style.display !== 'none' &&
-                                 window.getComputedStyle(recordButton).display !== 'none';
+  const isRecordButtonVisible =
+    recordButton.style.display !== 'none' &&
+    window.getComputedStyle(recordButton).display !== 'none';
 
   disclaimer.style.display = isRecordButtonVisible ? 'flex' : 'none';
 }
@@ -387,9 +401,8 @@ function updateRecordingButtonUI(isActive, recordingId) {
   syncDisclaimerVisibility();
 }
 
-
 // Function to show/hide spinner on record button during summarization
-window.setRecordButtonLoading = function(isLoading) {
+window.setRecordButtonLoading = (isLoading) => {
   const recordButton = document.getElementById('recordButton');
   const generateBtn = document.getElementById('generateBtn');
   if (!recordButton) return;
@@ -411,7 +424,8 @@ window.setRecordButtonLoading = function(isLoading) {
     if (!loadingSpinner) {
       loadingSpinner = document.createElement('div');
       loadingSpinner.id = 'recordButtonLoadingSpinner';
-      loadingSpinner.style.cssText = 'display: flex; align-items: center; justify-content: center;';
+      loadingSpinner.style.cssText =
+        'display: flex; align-items: center; justify-content: center;';
       loadingSpinner.innerHTML = `
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="animation: spin 1s linear infinite;">
           <style>
@@ -440,12 +454,14 @@ window.setRecordButtonLoading = function(isLoading) {
     }
 
     // Hide spinner
-    const loadingSpinner = document.getElementById('recordButtonLoadingSpinner');
+    const loadingSpinner = document.getElementById(
+      'recordButtonLoadingSpinner',
+    );
     if (loadingSpinner) {
       loadingSpinner.style.display = 'none';
     }
   }
-}
+};
 
 // Function to format date for section headers
 function formatDateHeader(dateString) {
@@ -518,10 +534,14 @@ async function saveCurrentNote() {
   }
 
   // Find which meeting is currently active by ID
-  const activeMeeting = [...upcomingMeetings, ...pastMeetings].find(m => m.id === currentEditingMeetingId);
+  const activeMeeting = [...upcomingMeetings, ...pastMeetings].find(
+    (m) => m.id === currentEditingMeetingId,
+  );
 
   if (activeMeeting) {
-    console.log(`Saving note with ID: ${currentEditingMeetingId}, Title: ${noteTitle}`);
+    console.log(
+      `Saving note with ID: ${currentEditingMeetingId}, Title: ${noteTitle}`,
+    );
 
     // Update the title
     activeMeeting.title = noteTitle;
@@ -549,13 +569,17 @@ async function saveCurrentNote() {
     }
 
     // Update the data arrays directly to make sure they stay in sync
-    const pastIndex = meetingsData.pastMeetings.findIndex(m => m.id === currentEditingMeetingId);
+    const pastIndex = meetingsData.pastMeetings.findIndex(
+      (m) => m.id === currentEditingMeetingId,
+    );
     if (pastIndex !== -1) {
       meetingsData.pastMeetings[pastIndex] = { ...activeMeeting };
       console.log('Updated meeting in pastMeetings array');
     }
 
-    const upcomingIndex = meetingsData.upcomingMeetings.findIndex(m => m.id === currentEditingMeetingId);
+    const upcomingIndex = meetingsData.upcomingMeetings.findIndex(
+      (m) => m.id === currentEditingMeetingId,
+    );
     if (upcomingIndex !== -1) {
       meetingsData.upcomingMeetings[upcomingIndex] = { ...activeMeeting };
       console.log('Updated meeting in upcomingMeetings array');
@@ -575,10 +599,15 @@ async function saveCurrentNote() {
       console.error('Error saving note:', error);
     }
   } else {
-    console.error(`Cannot save note: Meeting not found with ID: ${currentEditingMeetingId}`);
+    console.error(
+      `Cannot save note: Meeting not found with ID: ${currentEditingMeetingId}`,
+    );
 
     // Log all available meetings for debugging
-    console.log('Available meeting IDs:', [...upcomingMeetings, ...pastMeetings].map(m => m.id).join(', '));
+    console.log(
+      'Available meeting IDs:',
+      [...upcomingMeetings, ...pastMeetings].map((m) => m.id).join(', '),
+    );
   }
 }
 
@@ -591,20 +620,22 @@ function formatDate(date) {
 // Simple debounce function
 function debounce(func, wait) {
   let timeout;
-  return function(...args) {
-    const context = this;
+  return function (...args) {
     clearTimeout(timeout);
-    timeout = setTimeout(() => func.apply(context, args), wait);
+    timeout = setTimeout(() => func.apply(this, args), wait);
   };
 }
 
 // Unified Recording Pill Component Function
-function createRecordingPill(meeting, context = 'notes') {
-  // context can be 'notes', 'calendar', or 'editor'
+function createRecordingPill(meeting, _context = 'notes') {
+  // _context can be 'notes', 'calendar', or 'editor' (unused for now)
   const pill = document.createElement('div');
   pill.className = 'recording-pill unified-pill';
 
-  const hasActiveRecording = window.isRecording && window.currentRecordingId && window.currentMeetingId === meeting.id;
+  const hasActiveRecording =
+    window.isRecording &&
+    window.currentRecordingId &&
+    window.currentMeetingId === meeting.id;
   const now = new Date();
   const startTime = meeting.startTime ? new Date(meeting.startTime) : null;
   const isFuture = startTime && startTime > now;
@@ -612,11 +643,16 @@ function createRecordingPill(meeting, context = 'notes') {
   const hasTranscript = meeting.transcript && meeting.transcript.length > 0;
 
   // Format meeting time
-  const timeStr = startTime ? startTime.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true
-  }).replace(' ', '').toLowerCase() : '';
+  const timeStr = startTime
+    ? startTime
+        .toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        })
+        .replace(' ', '')
+        .toLowerCase()
+    : '';
 
   let pillContent = '';
 
@@ -640,13 +676,17 @@ function createRecordingPill(meeting, context = 'notes') {
         </svg>
         <span>Starts ${timeStr}</span>
       </div>
-      ${hasTranscript && !window.isRecording ? `
+      ${
+        hasTranscript && !window.isRecording
+          ? `
         <div class="pill-actions">
           <button class="generate-btn auto-btn" data-meeting-id="${meeting.id}">
             Auto
           </button>
         </div>
-      ` : ''}
+      `
+          : ''
+      }
     `;
   } else if (isFuture) {
     // Meeting starts later - just show the time
@@ -658,24 +698,32 @@ function createRecordingPill(meeting, context = 'notes') {
         </svg>
         <span>Starts at ${timeStr}</span>
       </div>
-      ${hasTranscript && !window.isRecording ? `
+      ${
+        hasTranscript && !window.isRecording
+          ? `
         <div class="pill-actions">
           <button class="generate-btn auto-btn" data-meeting-id="${meeting.id}">
             Auto
           </button>
         </div>
-      ` : ''}
+      `
+          : ''
+      }
     `;
   } else {
     // Past meeting or no time - show only auto-summarize if has transcript and not recording
     pillContent = `
-      ${hasTranscript && !window.isRecording ? `
+      ${
+        hasTranscript && !window.isRecording
+          ? `
         <div class="pill-actions">
           <button class="generate-btn auto-btn" data-meeting-id="${meeting.id}">
             Auto
           </button>
         </div>
-      ` : ''}
+      `
+          : ''
+      }
     `;
   }
 
@@ -684,7 +732,7 @@ function createRecordingPill(meeting, context = 'notes') {
   // Add event listeners after setting innerHTML
   const autoBtn = pill.querySelector('.auto-btn');
   if (autoBtn) {
-    autoBtn.addEventListener('click', function() {
+    autoBtn.addEventListener('click', function () {
       const meetingId = this.getAttribute('data-meeting-id');
       generateSummaryForMeeting(meetingId);
     });
@@ -694,7 +742,7 @@ function createRecordingPill(meeting, context = 'notes') {
 }
 
 // Global functions for recording pill actions
-window.startRecordingForMeeting = async function(meetingId) {
+window.startRecordingForMeeting = async (meetingId) => {
   console.log('Starting recording for meeting:', meetingId);
   currentEditingMeetingId = meetingId;
 
@@ -710,19 +758,21 @@ window.startRecordingForMeeting = async function(meetingId) {
       updateAllRecordingPills();
     } else {
       console.error('Failed to start recording:', result.error);
-      alert('Failed to start recording: ' + result.error);
+      alert(`Failed to start recording: ${result.error}`);
     }
   } catch (error) {
     console.error('Error starting recording:', error);
-    alert('Error starting recording: ' + error.message);
+    alert(`Error starting recording: ${error.message}`);
   }
 };
 
-window.stopRecordingForMeeting = async function(meetingId) {
+window.stopRecordingForMeeting = async (meetingId) => {
   console.log('Stopping recording for meeting:', meetingId);
   if (window.isRecording && window.currentRecordingId) {
     try {
-      const result = await window.electronAPI.generateSummary(window.currentRecordingId);
+      const result = await window.electronAPI.generateSummary(
+        window.currentRecordingId,
+      );
       if (result.success) {
         console.log('Recording stopped successfully');
         // The UI will be updated by the recording state change event
@@ -735,19 +785,24 @@ window.stopRecordingForMeeting = async function(meetingId) {
   }
 };
 
-window.generateSummaryForMeeting = async function(meetingId) {
+window.generateSummaryForMeeting = async (meetingId) => {
   console.log('Generating summary for meeting:', meetingId);
 
   // Show loading state
-  const buttons = document.querySelectorAll(`.auto-btn[data-meeting-id="${meetingId}"]`);
-  buttons.forEach(btn => {
+  const buttons = document.querySelectorAll(
+    `.auto-btn[data-meeting-id="${meetingId}"]`,
+  );
+  buttons.forEach((btn) => {
     btn.disabled = true;
     btn.textContent = 'Generating...';
   });
 
   try {
-    sdkLogger.log('Auto button: Requesting AI summary generation for meeting: ' + meetingId);
-    const result = await window.electronAPI.generateMeetingSummaryStreaming(meetingId);
+    sdkLogger.log(
+      `Auto button: Requesting AI summary generation for meeting: ${meetingId}`,
+    );
+    const result =
+      await window.electronAPI.generateMeetingSummaryStreaming(meetingId);
 
     if (result.success) {
       console.log('Summary generation completed');
@@ -756,8 +811,10 @@ window.generateSummaryForMeeting = async function(meetingId) {
       // Expand sidebar when summary is generated
       const sidebar = document.getElementById('sidebar');
       const editorContent = document.querySelector('.editor-content');
-      const chatInputContainer = document.querySelector('.chat-input-container');
-      if (sidebar && sidebar.classList.contains('hidden')) {
+      const chatInputContainer = document.querySelector(
+        '.chat-input-container',
+      );
+      if (sidebar?.classList.contains('hidden')) {
         sidebar.classList.remove('hidden');
         editorContent.classList.remove('full-width');
         chatInputContainer.style.display = 'block';
@@ -768,10 +825,10 @@ window.generateSummaryForMeeting = async function(meetingId) {
     }
   } catch (error) {
     console.error('Error generating summary:', error);
-    alert('Error generating summary: ' + error.message);
+    alert(`Error generating summary: ${error.message}`);
   } finally {
     // Reset button state
-    buttons.forEach(btn => {
+    buttons.forEach((btn) => {
       btn.disabled = false;
       btn.textContent = 'Auto';
     });
@@ -781,12 +838,16 @@ window.generateSummaryForMeeting = async function(meetingId) {
 // Function to update all recording pills when state changes
 function updateAllRecordingPills() {
   // Update future meeting indicator if exists
-  const futureMeetingIndicator = document.getElementById('futureMeetingIndicator');
+  const futureMeetingIndicator = document.getElementById(
+    'futureMeetingIndicator',
+  );
   if (futureMeetingIndicator && currentEditingMeetingId) {
     const meetingsData = window.electronAPI.loadMeetingsData();
-    meetingsData.then(data => {
-      const meeting = [...(data.upcomingMeetings || []), ...(data.pastMeetings || [])]
-        .find(m => m.id === currentEditingMeetingId);
+    meetingsData.then((data) => {
+      const meeting = [
+        ...(data.upcomingMeetings || []),
+        ...(data.pastMeetings || []),
+      ].find((m) => m.id === currentEditingMeetingId);
       if (meeting) {
         const pill = createRecordingPill(meeting, 'editor');
         futureMeetingIndicator.innerHTML = '';
@@ -799,7 +860,9 @@ function updateAllRecordingPills() {
   const calendarView = document.querySelector('.calendar-view');
   if (calendarView && calendarView.style.display !== 'none') {
     // Re-render calendar section
-    const calendarBtn = document.querySelector('.nav-btn[data-view="calendar"]');
+    const calendarBtn = document.querySelector(
+      '.nav-btn[data-view="calendar"]',
+    );
     if (calendarBtn) {
       calendarBtn.click();
     }
@@ -807,7 +870,7 @@ function updateAllRecordingPills() {
 }
 
 // Function to handle "Start now" button for future meetings (backward compatibility)
-window.startRecordingNow = async function() {
+window.startRecordingNow = async () => {
   console.log('Starting recording for future meeting');
 
   // For future meetings, we need to start recording directly
@@ -817,7 +880,9 @@ window.startRecordingNow = async function() {
   }
 
   try {
-    const result = await window.electronAPI.startManualRecording(currentEditingMeetingId);
+    const result = await window.electronAPI.startManualRecording(
+      currentEditingMeetingId,
+    );
     if (result.success) {
       console.log('Recording started successfully:', result.recordingId);
       window.isRecording = true;
@@ -825,7 +890,9 @@ window.startRecordingNow = async function() {
       window.currentMeetingId = currentEditingMeetingId;
 
       // Update the UI by refreshing the future meeting indicator
-      const futureMeetingIndicator = document.getElementById('futureMeetingIndicator');
+      const futureMeetingIndicator = document.getElementById(
+        'futureMeetingIndicator',
+      );
       if (futureMeetingIndicator) {
         futureMeetingIndicator.innerHTML = `
           <div class="meeting-time-info">
@@ -840,7 +907,9 @@ window.startRecordingNow = async function() {
         `;
 
         // Add event listener for stop button
-        const stopBtn = futureMeetingIndicator.querySelector('.stop-recording-btn');
+        const stopBtn = futureMeetingIndicator.querySelector(
+          '.stop-recording-btn',
+        );
         if (stopBtn) {
           stopBtn.addEventListener('click', () => {
             window.stopCurrentRecording();
@@ -849,20 +918,22 @@ window.startRecordingNow = async function() {
       }
     } else {
       console.error('Failed to start recording:', result.error);
-      alert('Failed to start recording: ' + result.error);
+      alert(`Failed to start recording: ${result.error}`);
     }
   } catch (error) {
     console.error('Error starting recording:', error);
-    alert('Error starting recording: ' + error.message);
+    alert(`Error starting recording: ${error.message}`);
   }
 };
 
 // Function to handle "Stop Recording" button for future meetings that have started recording
-window.stopCurrentRecording = async function() {
+window.stopCurrentRecording = async () => {
   console.log('Stopping recording from future meeting indicator');
   if (window.isRecording && window.currentRecordingId) {
     try {
-      const result = await window.electronAPI.generateSummary(window.currentRecordingId);
+      const result = await window.electronAPI.generateSummary(
+        window.currentRecordingId,
+      );
       if (result.success) {
         console.log('Recording stopped successfully');
         // The UI will be updated by the recording state change event
@@ -889,48 +960,51 @@ function showAttendeesDropdown(meeting, triggerElement) {
 
   // Filter out the logged-in user
   const allAttendees = meeting.attendees || [];
-  const attendees = allAttendees.filter(attendee => !attendee.isSelf);
+  const attendees = allAttendees.filter((attendee) => !attendee.isSelf);
 
-  let attendeesListHtml = attendees.map(attendee => {
-    const attendeeName = attendee.name || attendee.email?.split('@')[0] || 'User';
-    const attendeeTitle = attendee.title || attendee.role || '';
-    const attendeeEmail = attendee.email || '';
+  const attendeesListHtml = attendees
+    .map((attendee) => {
+      const attendeeName =
+        attendee.name || attendee.email?.split('@')[0] || 'User';
+      const attendeeTitle = attendee.title || attendee.role || '';
+      const attendeeEmail = attendee.email || '';
 
-    // Get status indicator
-    let statusIndicator = '';
-    if (attendee.status === 'STATUS_ACCEPTED') {
-      statusIndicator = `
+      // Get status indicator
+      let statusIndicator = '';
+      if (attendee.status === 'STATUS_ACCEPTED') {
+        statusIndicator = `
         <div class="status-indicator status-accepted" title="Accepted">
           <svg width="8" height="8" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M6 11.5L2.5 8L3.91 6.59L6 8.67L12.09 2.59L13.5 4L6 11.5Z" fill="#0F9D58"/>
           </svg>
         </div>
       `;
-    } else if (attendee.status === 'STATUS_DECLINED') {
-      statusIndicator = `
+      } else if (attendee.status === 'STATUS_DECLINED') {
+        statusIndicator = `
         <div class="status-indicator status-declined" title="Declined">
           <svg width="8" height="8" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M12.59 4L8 8.59L3.41 4L2 5.41L6.59 10L2 14.59L3.41 16L8 11.41L12.59 16L14 14.59L9.41 10L14 5.41L12.59 4Z" fill="#DB4437"/>
           </svg>
         </div>
       `;
-    } else if (attendee.status === 'STATUS_TENTATIVE') {
-      statusIndicator = `
+      } else if (attendee.status === 'STATUS_TENTATIVE') {
+        statusIndicator = `
         <div class="status-indicator status-tentative" title="Tentative">
           <svg width="8" height="8" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M7 11H9V13H7V11ZM8 2C4.69 2 2 4.69 2 8C2 11.31 4.69 14 8 14C11.31 14 14 11.31 14 8C14 4.69 11.31 2 8 2ZM8 12.4C5.57 12.4 3.6 10.43 3.6 8C3.6 5.57 5.57 3.6 8 3.6C10.43 3.6 12.4 5.57 12.4 8C12.4 10.43 10.43 12.4 8 12.4ZM8 5C6.9 5 6 5.9 6 7H7.2C7.2 6.56 7.56 6.2 8 6.2C8.44 6.2 8.8 6.56 8.8 7C8.8 8.2 7 8.05 7 10H8.2C8.2 8.75 10 8.6 10 7C10 5.9 9.1 5 8 5Z" fill="#F4B400"/>
           </svg>
         </div>
       `;
-    }
+      }
 
-    return `
+      return `
       <div class="attendee-item">
         <div class="attendee-item-left">
           <div class="attendee-avatar-large">
-            ${attendee.photo_url ?
-              `<img src="${attendee.photo_url}" alt="${attendeeName}" />` :
-              `<div class="avatar-placeholder-large">${attendeeName.charAt(0).toUpperCase()}</div>`
+            ${
+              attendee.photo_url
+                ? `<img src="${attendee.photo_url}" alt="${attendeeName}" />`
+                : `<div class="avatar-placeholder-large">${attendeeName.charAt(0).toUpperCase()}</div>`
             }
             ${statusIndicator}
           </div>
@@ -940,7 +1014,9 @@ function showAttendeesDropdown(meeting, triggerElement) {
           </div>
         </div>
         <div class="attendee-actions">
-          ${attendeeEmail ? `
+          ${
+            attendeeEmail
+              ? `
             <button class="attendee-action-btn" data-email="${attendeeEmail}" title="Copy email">
               <svg class="email-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M20 4H4C2.9 4 2.01 4.9 2.01 6L2 18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6C22 4.9 21.1 4 20 4ZM20 18H4V8L12 13L20 8V18ZM12 11L4 6H20L12 11Z" fill="currentColor"/>
@@ -949,11 +1025,14 @@ function showAttendeesDropdown(meeting, triggerElement) {
                 <path d="M16 1H4C2.9 1 2 1.9 2 3V17H4V3H16V1ZM19 5H8C6.9 5 6 5.9 6 7V21C6 22.1 6.9 23 8 23H19C20.1 23 21 22.1 21 21V7C21 5.9 20.1 5 19 5ZM19 21H8V7H19V21Z" fill="currentColor"/>
               </svg>
             </button>
-          ` : ''}
+          `
+              : ''
+          }
         </div>
       </div>
     `;
-  }).join('');
+    })
+    .join('');
 
   dropdown.innerHTML = `
     <div class="attendees-dropdown-header">
@@ -972,7 +1051,7 @@ function showAttendeesDropdown(meeting, triggerElement) {
   dropdown.style.left = `${rect.left}px`;
 
   // Add email copy handlers
-  dropdown.querySelectorAll('.attendee-action-btn').forEach(btn => {
+  dropdown.querySelectorAll('.attendee-action-btn').forEach((btn) => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       const email = btn.dataset.email;
@@ -1014,7 +1093,7 @@ function createUpcomingMeetingCard(meeting) {
   const timeStr = meetingDate.toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
-    hour12: false
+    hour12: false,
   });
 
   // Format day (Today, Tomorrow, or day name)
@@ -1028,19 +1107,22 @@ function createUpcomingMeetingCard(meeting) {
   }
 
   // Create date badge
-  const monthStr = meetingDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+  const monthStr = meetingDate
+    .toLocaleDateString('en-US', { month: 'short' })
+    .toUpperCase();
   const dayNum = meetingDate.getDate();
 
   // Get attendees info - filter out the logged-in user
   const allAttendees = meeting.attendees || [];
-  const attendees = allAttendees.filter(attendee => !attendee.isSelf);
+  const attendees = allAttendees.filter((attendee) => !attendee.isSelf);
   const totalAttendees = attendees.length;
 
   // Get first attendee for display
   let attendeesHtml = '';
   if (totalAttendees > 0) {
     const firstAttendee = attendees[0];
-    const attendeeName = firstAttendee.name || firstAttendee.email?.split('@')[0] || 'User';
+    const attendeeName =
+      firstAttendee.name || firstAttendee.email?.split('@')[0] || 'User';
     const additionalCount = totalAttendees - 1;
 
     // Get status indicator
@@ -1074,9 +1156,10 @@ function createUpcomingMeetingCard(meeting) {
     attendeesHtml = `
       <div class="meeting-attendees" data-meeting-id="${meeting.id}">
         <div class="attendee-avatar">
-          ${firstAttendee.photo_url ?
-            `<img src="${firstAttendee.photo_url}" alt="${attendeeName}" />` :
-            `<div class="avatar-placeholder">${attendeeName.charAt(0).toUpperCase()}</div>`
+          ${
+            firstAttendee.photo_url
+              ? `<img src="${firstAttendee.photo_url}" alt="${attendeeName}" />`
+              : `<div class="avatar-placeholder">${attendeeName.charAt(0).toUpperCase()}</div>`
           }
           ${statusIndicator}
         </div>
@@ -1103,8 +1186,8 @@ function createUpcomingMeetingCard(meeting) {
     console.log('Upcoming meeting clicked:', meeting);
 
     // Check if a note already exists for this meeting
-    let existingNote = [...pastMeetings, ...upcomingMeetings].find(m =>
-      m.id === meeting.id || m.calendarEventId === meeting.id
+    let existingNote = [...pastMeetings, ...upcomingMeetings].find(
+      (m) => m.id === meeting.id || m.calendarEventId === meeting.id,
     );
 
     if (!existingNote) {
@@ -1122,7 +1205,7 @@ function createUpcomingMeetingCard(meeting) {
         attendees: meeting.attendees || [],
         location: meeting.location,
         videoMeetingUrl: meeting.videoMeetingUrl,
-        isFuture: true // Mark as future meeting
+        isFuture: true, // Mark as future meeting
       };
 
       // Add to upcomingMeetings (not pastMeetings for future meetings)
@@ -1133,11 +1216,13 @@ function createUpcomingMeetingCard(meeting) {
       await window.electronAPI.saveMeetingsData(meetingsData);
     } else {
       // Update existing note with latest calendar data (including attendees)
-      existingNote.attendees = meeting.attendees || existingNote.attendees || [];
+      existingNote.attendees =
+        meeting.attendees || existingNote.attendees || [];
       existingNote.startTime = meeting.startTime || existingNote.startTime;
       existingNote.endTime = meeting.endTime || existingNote.endTime;
       existingNote.location = meeting.location || existingNote.location;
-      existingNote.videoMeetingUrl = meeting.videoMeetingUrl || existingNote.videoMeetingUrl;
+      existingNote.videoMeetingUrl =
+        meeting.videoMeetingUrl || existingNote.videoMeetingUrl;
     }
 
     // Open the note (either existing or newly created)
@@ -1158,10 +1243,10 @@ function createMeetingCardWithTime(meeting) {
   const timeStr = meetingDate.toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
-    hour12: false
+    hour12: false,
   });
 
-  let iconHtml = `
+  const iconHtml = `
     <div class="meeting-icon document">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M14 2H6C4.9 2 4.01 2.9 4.01 4L4 20C4 21.1 4.89 22 5.99 22H18C19.1 22 20 21.1 20 20V8L14 2ZM16 18H8V16H16V18ZM16 14H8V12H16V14ZM13 9V3.5L18.5 9H13Z" fill="#9CA3AF"/>
@@ -1172,7 +1257,7 @@ function createMeetingCardWithTime(meeting) {
   // Extract participant names if available
   let subtitle = meeting.subtitle;
   if (meeting.participants && meeting.participants.length > 0) {
-    subtitle = meeting.participants.map(p => p.name).join(', ');
+    subtitle = meeting.participants.map((p) => p.name).join(', ');
   }
 
   card.innerHTML = `
@@ -1183,59 +1268,6 @@ function createMeetingCardWithTime(meeting) {
     </div>
     <div class="meeting-time-right">
       <span class="time-text">${timeStr}</span>
-      <button class="delete-meeting-btn" data-id="${meeting.id}" title="Delete note">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" fill="currentColor"/>
-        </svg>
-      </button>
-    </div>
-  `;
-
-  return card;
-}
-
-function createMeetingCard(meeting) {
-  const card = document.createElement('div');
-  card.className = 'meeting-card';
-  card.dataset.id = meeting.id;
-
-  let iconHtml = '';
-
-  if (meeting.type === 'profile') {
-    iconHtml = `
-      <div class="profile-pic">
-        <img src="https://via.placeholder.com/40" alt="Profile">
-      </div>
-    `;
-  } else if (meeting.type === 'calendar') {
-    iconHtml = `
-      <div class="meeting-icon calendar">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M19 4H18V2H16V4H8V2H6V4H5C3.89 4 3.01 4.9 3.01 6L3 20C3 21.1 3.89 22 5 22H19C20.1 22 21 21.1 21 20V6C21 4.9 20.1 4 19 4ZM19 20H5V10H19V20ZM19 8H5V6H19V8ZM9 14H7V12H9V14ZM13 14H11V12H13V14ZM17 14H15V12H17V14ZM9 18H7V16H9V18ZM13 18H11V16H13V18ZM17 18H15V16H17V18Z" fill="#6947BD"/>
-        </svg>
-      </div>
-    `;
-  } else if (meeting.type === 'document') {
-    iconHtml = `
-      <div class="meeting-icon document">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M14 2H6C4.9 2 4.01 2.9 4.01 4L4 20C4 21.1 4.89 22 5.99 22H18C19.1 22 20 21.1 20 20V8L14 2ZM16 18H8V16H16V18ZM16 14H8V12H16V14ZM13 9V3.5L18.5 9H13Z" fill="#4CAF50"/>
-        </svg>
-      </div>
-    `;
-  }
-
-  let subtitleHtml = meeting.hasDemo
-    ? `<div class="meeting-time"><a class="meeting-demo-link">${meeting.subtitle}</a></div>`
-    : `<div class="meeting-time">${meeting.subtitle}</div>`;
-
-  card.innerHTML = `
-    ${iconHtml}
-    <div class="meeting-content">
-      <div class="meeting-title">${meeting.title}</div>
-      ${subtitleHtml}
-    </div>
-    <div class="meeting-actions">
       <button class="delete-meeting-btn" data-id="${meeting.id}" title="Delete note">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" fill="currentColor"/>
@@ -1259,17 +1291,17 @@ function updateLiveTranscript(transcript) {
   }
 
   // Group consecutive messages from the same speaker
-  let processedTranscript = [];
+  const processedTranscript = [];
   let currentSpeaker = null;
   let currentMessages = [];
 
-  transcript.forEach(entry => {
+  transcript.forEach((entry) => {
     if (entry.speaker !== currentSpeaker) {
       if (currentSpeaker && currentMessages.length > 0) {
         processedTranscript.push({
           speaker: currentSpeaker,
           messages: [...currentMessages],
-          timestamp: currentMessages[0].timestamp
+          timestamp: currentMessages[0].timestamp,
         });
       }
       currentSpeaker = entry.speaker;
@@ -1284,7 +1316,7 @@ function updateLiveTranscript(transcript) {
     processedTranscript.push({
       speaker: currentSpeaker,
       messages: [...currentMessages],
-      timestamp: currentMessages[0].timestamp
+      timestamp: currentMessages[0].timestamp,
     });
   }
 
@@ -1314,14 +1346,17 @@ function updateLiveTranscript(transcript) {
     // Add combined text
     const textDiv = document.createElement('div');
     textDiv.className = 'message-text';
-    textDiv.textContent = group.messages.map(m => m.text).join(' ');
+    textDiv.textContent = group.messages.map((m) => m.text).join(' ');
     bubble.appendChild(textDiv);
 
     // Add timestamp
     const timeDiv = document.createElement('div');
     timeDiv.className = 'message-time';
     const time = new Date(group.timestamp);
-    timeDiv.textContent = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    timeDiv.textContent = time.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
     bubble.appendChild(timeDiv);
 
     messageDiv.appendChild(bubble);
@@ -1393,7 +1428,9 @@ function showHomeView() {
 
 // Function to show editor view
 function showEditorView(meetingId, isFutureMeeting = false) {
-  console.log(`Showing editor view for meeting ID: ${meetingId}, Future: ${isFutureMeeting}`);
+  console.log(
+    `Showing editor view for meeting ID: ${meetingId}, Future: ${isFutureMeeting}`,
+  );
 
   // Make the views visible/hidden
   document.getElementById('homeView').style.display = 'none';
@@ -1428,10 +1465,12 @@ function showEditorView(meetingId, isFutureMeeting = false) {
   }
 
   // Find the meeting in either upcoming or past meetings
-  let meeting = [...upcomingMeetings, ...pastMeetings].find(m => m.id === meetingId);
+  const meeting = [...upcomingMeetings, ...pastMeetings].find(
+    (m) => m.id === meetingId,
+  );
 
   // Update transcript service with meeting data
-  if (meeting && meeting.transcript && meeting.transcript.length > 0) {
+  if (meeting?.transcript?.length > 0) {
     transcriptService.setTranscript(meeting.transcript);
     if (window.updateTranscriptButtons) {
       window.updateTranscriptButtons(true);
@@ -1467,8 +1506,6 @@ function showEditorView(meetingId, isFutureMeeting = false) {
   currentEditingMeetingId = meetingId;
   console.log(`Now editing meeting: ${meetingId} - ${meeting.title}`);
 
-
-
   // Set the meeting title
   document.getElementById('noteTitle').textContent = meeting.title;
 
@@ -1479,11 +1516,12 @@ function showEditorView(meetingId, isFutureMeeting = false) {
   // Set up participants display - filter out the logged-in user
   const participantsElement = document.getElementById('noteParticipants');
   const allAttendees = meeting.attendees || [];
-  const attendees = allAttendees.filter(attendee => !attendee.isSelf);
+  const attendees = allAttendees.filter((attendee) => !attendee.isSelf);
 
   if (attendees.length > 0) {
     const firstAttendee = attendees[0];
-    const attendeeName = firstAttendee.name || firstAttendee.email?.split('@')[0] || 'User';
+    const attendeeName =
+      firstAttendee.name || firstAttendee.email?.split('@')[0] || 'User';
     const additionalCount = attendees.length - 1;
 
     // Get status indicator
@@ -1516,9 +1554,10 @@ function showEditorView(meetingId, isFutureMeeting = false) {
 
     participantsElement.innerHTML = `
       <div class="attendee-avatar">
-        ${firstAttendee.photo_url ?
-          `<img src="${firstAttendee.photo_url}" alt="${attendeeName}" />` :
-          `<div class="avatar-placeholder">${attendeeName.charAt(0).toUpperCase()}</div>`
+        ${
+          firstAttendee.photo_url
+            ? `<img src="${firstAttendee.photo_url}" alt="${attendeeName}" />`
+            : `<div class="avatar-placeholder">${attendeeName.charAt(0).toUpperCase()}</div>`
         }
         ${statusIndicator}
       </div>
@@ -1528,7 +1567,10 @@ function showEditorView(meetingId, isFutureMeeting = false) {
 
     // Remove any existing click handlers by cloning the element
     const newParticipantsElement = participantsElement.cloneNode(true);
-    participantsElement.parentNode.replaceChild(newParticipantsElement, participantsElement);
+    participantsElement.parentNode.replaceChild(
+      newParticipantsElement,
+      participantsElement,
+    );
 
     // Add click handler to show dropdown
     newParticipantsElement.style.cursor = 'pointer';
@@ -1564,20 +1606,25 @@ function showEditorView(meetingId, isFutureMeeting = false) {
       // Load personal notes
       if (meeting.personalNotes) {
         personalNotesElement.value = meeting.personalNotes;
-        console.log(`Loaded personal notes for meeting: ${meetingId}, length: ${meeting.personalNotes.length} characters`);
+        console.log(
+          `Loaded personal notes for meeting: ${meetingId}, length: ${meeting.personalNotes.length} characters`,
+        );
       } else if (meeting.content) {
         // Migrate legacy content to personal notes
         personalNotesElement.value = meeting.content;
         meeting.personalNotes = meeting.content;
-        console.log(`Migrated legacy content to personal notes for meeting: ${meetingId}`);
+        console.log(
+          `Migrated legacy content to personal notes for meeting: ${meetingId}`,
+        );
       }
 
       // Load AI summary if it exists
       if (meeting.aiSummary && aiSummaryEditor) {
         aiSummaryEditor.value = meeting.aiSummary;
-        console.log(`Loaded AI summary for meeting: ${meetingId}, length: ${meeting.aiSummary.length} characters`);
+        console.log(
+          `Loaded AI summary for meeting: ${meetingId}, length: ${meeting.aiSummary.length} characters`,
+        );
       }
-
 
       // Load meeting video if available
       loadMeetingVideo(meeting);
@@ -1585,7 +1632,9 @@ function showEditorView(meetingId, isFutureMeeting = false) {
       // Legacy single editor
       if (meeting.content) {
         legacyEditorElement.value = meeting.content;
-        console.log(`Loaded content for meeting: ${meetingId}, length: ${meeting.content.length} characters`);
+        console.log(
+          `Loaded content for meeting: ${meetingId}, length: ${meeting.content.length} characters`,
+        );
       } else {
         // If content is missing, create template
         const now = new Date();
@@ -1607,7 +1656,7 @@ function showEditorView(meetingId, isFutureMeeting = false) {
 
     // Handle future meeting UI
     const floatingControls = document.querySelector('.floating-controls');
-    if (meeting && meeting.startTime) {
+    if (meeting?.startTime) {
       const startTime = new Date(meeting.startTime);
       const now = new Date();
       const timeDiff = startTime - now;
@@ -1615,25 +1664,35 @@ function showEditorView(meetingId, isFutureMeeting = false) {
 
       if (timeDiff > 0) {
         // This is a future meeting
-        console.log(`Future meeting starts in ${hoursUntilMeeting.toFixed(1)} hours`);
+        console.log(
+          `Future meeting starts in ${hoursUntilMeeting.toFixed(1)} hours`,
+        );
 
         // Always show floating controls for future meetings
         if (floatingControls) {
           floatingControls.style.display = 'flex';
 
           // Add meeting time to the floating controls for all future meetings
-          const timeStr = startTime.toLocaleTimeString('en-US', {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-          }).replace(' ', '').toLowerCase();
+          const timeStr = startTime
+            .toLocaleTimeString('en-US', {
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true,
+            })
+            .replace(' ', '')
+            .toLowerCase();
 
           // Create or update meeting time display in floating controls
-          let timeDisplay = floatingControls.querySelector('.meeting-time-display');
+          let timeDisplay = floatingControls.querySelector(
+            '.meeting-time-display',
+          );
           if (!timeDisplay) {
             timeDisplay = document.createElement('div');
             timeDisplay.className = 'meeting-time-display';
-            floatingControls.insertBefore(timeDisplay, floatingControls.firstChild);
+            floatingControls.insertBefore(
+              timeDisplay,
+              floatingControls.firstChild,
+            );
           }
           timeDisplay.innerHTML = `
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1644,7 +1703,8 @@ function showEditorView(meetingId, isFutureMeeting = false) {
           `;
 
           // Hide recording buttons for meetings more than 2 hours away
-          const controlButtons = floatingControls.querySelector('.control-buttons');
+          const controlButtons =
+            floatingControls.querySelector('.control-buttons');
           if (controlButtons) {
             if (hoursUntilMeeting > 2) {
               controlButtons.style.display = 'none';
@@ -1675,14 +1735,18 @@ function showEditorView(meetingId, isFutureMeeting = false) {
         // Show recording controls and remove any meeting time display
         if (floatingControls) {
           floatingControls.style.display = 'flex';
-          const timeDisplay = floatingControls.querySelector('.meeting-time-display');
+          const timeDisplay = floatingControls.querySelector(
+            '.meeting-time-display',
+          );
           if (timeDisplay) {
             timeDisplay.remove();
           }
         }
 
         // Check if meeting is older than 4 hours
-        const endTime = meeting.endTime ? new Date(meeting.endTime) : new Date(meeting.startTime || meeting.date);
+        const endTime = meeting.endTime
+          ? new Date(meeting.endTime)
+          : new Date(meeting.startTime || meeting.date);
         const now = new Date();
         const hoursSinceEnd = (now - endTime) / (1000 * 60 * 60);
 
@@ -1714,7 +1778,9 @@ function showEditorView(meetingId, isFutureMeeting = false) {
       // Show recording controls and remove any meeting time display
       if (floatingControls) {
         floatingControls.style.display = 'flex';
-        const timeDisplay = floatingControls.querySelector('.meeting-time-display');
+        const timeDisplay = floatingControls.querySelector(
+          '.meeting-time-display',
+        );
         if (timeDisplay) {
           timeDisplay.remove();
         }
@@ -1747,7 +1813,9 @@ function showEditorView(meetingId, isFutureMeeting = false) {
         updateDebugParticipants(meeting.participants);
       } else {
         // Clear participants area if no participants
-        const participantsContent = document.getElementById('participantsContent');
+        const participantsContent = document.getElementById(
+          'participantsContent',
+        );
         if (participantsContent) {
           participantsContent.innerHTML = `
             <div class="placeholder-content">
@@ -1805,14 +1873,15 @@ function titleKeydownHandler(e) {
 // Create a single reference to the auto-save handler to ensure we can remove it properly
 let currentAutoSaveHandler = null;
 
-
 // Function to set up auto-save handler
 function setupAutoSaveHandler() {
   // Create a debounced auto-save handler
   const autoSaveHandler = debounce(async () => {
     console.log('Auto-saving note due to content change');
     if (currentEditingMeetingId) {
-      console.log(`Auto-save triggered for meeting: ${currentEditingMeetingId}`);
+      console.log(
+        `Auto-save triggered for meeting: ${currentEditingMeetingId}`,
+      );
       await saveCurrentNote();
     } else {
       console.warn('Cannot auto-save: No active meeting ID');
@@ -1822,7 +1891,9 @@ function setupAutoSaveHandler() {
   // First remove any existing handler
   if (currentAutoSaveHandler) {
     const legacyEditor = document.getElementById('simple-editor');
-    const personalNotesEditor = document.getElementById('personal-notes-editor');
+    const personalNotesEditor = document.getElementById(
+      'personal-notes-editor',
+    );
     const aiSummaryEditor = document.getElementById('ai-summary-editor');
 
     if (legacyEditor) {
@@ -1830,7 +1901,9 @@ function setupAutoSaveHandler() {
       legacyEditor.removeEventListener('input', currentAutoSaveHandler);
     }
     if (personalNotesEditor) {
-      console.log('Removing existing auto-save handler from personal notes editor');
+      console.log(
+        'Removing existing auto-save handler from personal notes editor',
+      );
       personalNotesEditor.removeEventListener('input', currentAutoSaveHandler);
     }
     if (aiSummaryEditor) {
@@ -1851,7 +1924,9 @@ function setupAutoSaveHandler() {
     // New tabbed editor - attach to both editors
     personalNotesEditor.addEventListener('input', autoSaveHandler);
     aiSummaryEditor.addEventListener('input', autoSaveHandler);
-    console.log(`Set up tabbed editor auto-save handlers for meeting: ${currentEditingMeetingId || 'none'}`);
+    console.log(
+      `Set up tabbed editor auto-save handlers for meeting: ${currentEditingMeetingId || 'none'}`,
+    );
 
     // Manually trigger a save once to ensure the content is saved
     setTimeout(() => {
@@ -1860,7 +1935,9 @@ function setupAutoSaveHandler() {
     }, 500);
   } else if (legacyEditor) {
     legacyEditor.addEventListener('input', autoSaveHandler);
-    console.log(`Set up legacy editor auto-save handler for meeting: ${currentEditingMeetingId || 'none'}`);
+    console.log(
+      `Set up legacy editor auto-save handler for meeting: ${currentEditingMeetingId || 'none'}`,
+    );
 
     // Manually trigger a save once to ensure the content is saved
     setTimeout(() => {
@@ -1886,7 +1963,7 @@ async function createNewMeeting() {
   currentEditingMeetingId = null;
 
   // Generate a unique ID
-  const id = 'meeting-' + Date.now();
+  const id = `meeting-${Date.now()}`;
   console.log('Generated new meeting ID:', id);
 
   // Current date and time
@@ -1900,15 +1977,20 @@ async function createNewMeeting() {
     id: id,
     type: 'document', // Explicitly set as document type, not calendar
     title: 'New Note',
-    subtitle: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    subtitle: now.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    }),
     hasDemo: false,
     date: now.toISOString(),
     participants: [],
-    content: template // Set the content directly
+    content: template, // Set the content directly
   };
 
   // Log what we're adding
-  console.log(`Adding new meeting: id=${id}, title=${newMeeting.title}, content.length=${template.length}`);
+  console.log(
+    `Adding new meeting: id=${id}, title=${newMeeting.title}, content.length=${template.length}`,
+  );
 
   // Add to pastMeetings - make sure to push to both arrays
   pastMeetings.unshift(newMeeting);
@@ -1951,10 +2033,14 @@ async function createNewMeeting() {
   try {
     console.log('Auto-starting recording for new note');
     // Start manual recording for the new note
-    window.electronAPI.startManualRecording(id)
-      .then(result => {
+    window.electronAPI
+      .startManualRecording(id)
+      .then((result) => {
         if (result.success) {
-          console.log('Auto-started recording for new note with ID:', result.recordingId);
+          console.log(
+            'Auto-started recording for new note with ID:',
+            result.recordingId,
+          );
           // Update recording button UI
           window.isRecording = true;
           window.currentRecordingId = result.recordingId;
@@ -1974,7 +2060,7 @@ async function createNewMeeting() {
           console.error('Failed to auto-start recording:', result.error);
         }
       })
-      .catch(error => {
+      .catch((error) => {
         console.error('Error auto-starting recording:', error);
       });
   } catch (error) {
@@ -2017,10 +2103,10 @@ async function fetchPastMeetings() {
     const result = await window.electronAPI.calendar.getPastMeetings(7); // Past 7 days
 
     if (result.success && result.meetings && Array.isArray(result.meetings)) {
-      result.meetings.forEach(meeting => {
+      result.meetings.forEach((meeting) => {
         // Check if note already exists
-        const existingNote = [...pastMeetings, ...upcomingMeetings].find(m =>
-          m.id === meeting.id || m.calendarEventId === meeting.id
+        const existingNote = [...pastMeetings, ...upcomingMeetings].find(
+          (m) => m.id === meeting.id || m.calendarEventId === meeting.id,
         );
 
         if (!existingNote) {
@@ -2038,7 +2124,7 @@ async function fetchPastMeetings() {
             attendees: meeting.attendees || [],
             location: meeting.location,
             videoMeetingUrl: meeting.videoMeetingUrl,
-            isFuture: false
+            isFuture: false,
           };
 
           // Add to pastMeetings
@@ -2066,47 +2152,41 @@ async function fetchPastMeetings() {
 
 function renderMeetings() {
   // Clear previous content
-  const mainContent = document.querySelector('.main-content .content-container');
+  const mainContent = document.querySelector(
+    '.main-content .content-container',
+  );
   mainContent.innerHTML = '';
+  const now = new Date();
 
   // Create "Coming up" section - always show it with refresh button
-  if (true) { // Always render the section
-    const upcomingSection = document.createElement('section');
-    upcomingSection.className = 'upcoming-section';
+  const upcomingSection = document.createElement('section');
+  upcomingSection.className = 'upcoming-section';
 
-    // Sort calendar meetings by start time
-    const sortedMeetings = [...calendarMeetings].sort((a, b) => {
-      return new Date(a.startTime) - new Date(b.startTime);
-    });
+  // Sort calendar meetings by start time
+  const sortedMeetings = [...calendarMeetings].sort((a, b) => {
+    return new Date(a.startTime) - new Date(b.startTime);
+  });
 
-    // Filter meetings for today and this week
-    const now = new Date();
-    const endOfToday = new Date(now);
-    endOfToday.setHours(23, 59, 59, 999);
+  // Filter meetings for today and this week
+  const endOfToday = new Date(now);
+  endOfToday.setHours(23, 59, 59, 999);
 
-    const endOfWeek = new Date(now);
-    const daysUntilEndOfWeek = 6 - now.getDay() + 7; // Current week + next week
-    endOfWeek.setDate(now.getDate() + daysUntilEndOfWeek);
-    endOfWeek.setHours(23, 59, 59, 999);
+  const endOfWeek = new Date(now);
+  const daysUntilEndOfWeek = 6 - now.getDay() + 7; // Current week + next week
+  endOfWeek.setDate(now.getDate() + daysUntilEndOfWeek);
+  endOfWeek.setHours(23, 59, 59, 999);
 
-    const todayMeetings = sortedMeetings.filter(meeting => {
-      const meetingStart = new Date(meeting.startTime);
-      const meetingEnd = new Date(meeting.endTime);
-      // Show if meeting hasn't ended yet (includes ongoing meetings)
-      return meetingEnd >= now && meetingStart <= endOfToday;
-    });
+  const weekMeetings = sortedMeetings.filter((meeting) => {
+    const meetingStart = new Date(meeting.startTime);
+    const meetingEnd = new Date(meeting.endTime);
+    // Show if meeting hasn't ended yet (includes ongoing meetings)
+    return meetingEnd >= now && meetingStart <= endOfWeek;
+  });
 
-    const weekMeetings = sortedMeetings.filter(meeting => {
-      const meetingStart = new Date(meeting.startTime);
-      const meetingEnd = new Date(meeting.endTime);
-      // Show if meeting hasn't ended yet (includes ongoing meetings)
-      return meetingEnd >= now && meetingStart <= endOfWeek;
-    });
+  let showingAll = false;
+  const hasMoreMeetings = weekMeetings.length > 4;
 
-    let showingAll = false;
-    const hasMoreMeetings = weekMeetings.length > 4;
-
-    upcomingSection.innerHTML = `
+  upcomingSection.innerHTML = `
       <div class="section-header">
         <h2 class="section-title">Coming up</h2>
         <div style="display: flex; gap: 8px; align-items: center;">
@@ -2120,140 +2200,176 @@ function renderMeetings() {
       </div>
       <div class="upcoming-meetings-list" id="upcoming-list"></div>
     `;
-    mainContent.appendChild(upcomingSection);
+  mainContent.appendChild(upcomingSection);
 
-    const upcomingContainer = document.getElementById('upcoming-list');
+  const upcomingContainer = document.getElementById('upcoming-list');
 
-    // Function to render meetings
-    const renderUpcomingMeetings = (meetings) => {
-      upcomingContainer.innerHTML = '';
-      if (meetings.length === 0) {
-        upcomingContainer.innerHTML = '<p style="color: #6B7280; padding: 20px; text-align: center;">No upcoming meetings</p>';
-      } else {
-        meetings.forEach(meeting => {
-          upcomingContainer.appendChild(createUpcomingMeetingCard(meeting));
-        });
-      }
-    };
-
-    // Initially show first 4 meetings or empty state
-    renderUpcomingMeetings(weekMeetings.slice(0, 4));
-
-    // Handle show more button
-    if (weekMeetings.length > 4) {
-      const showMoreBtn = document.getElementById('showMoreUpcoming');
-      showMoreBtn.addEventListener('click', () => {
-        showingAll = !showingAll;
-        if (showingAll) {
-          renderUpcomingMeetings(weekMeetings);
-          showMoreBtn.textContent = 'Show less';
-        } else {
-          renderUpcomingMeetings(weekMeetings.slice(0, 4));
-          showMoreBtn.textContent = 'Show more';
-        }
+  // Function to render meetings
+  const renderUpcomingMeetings = (meetings) => {
+    upcomingContainer.innerHTML = '';
+    if (meetings.length === 0) {
+      upcomingContainer.innerHTML =
+        '<p style="color: #6B7280; padding: 20px; text-align: center;">No upcoming meetings</p>';
+    } else {
+      meetings.forEach((meeting) => {
+        upcomingContainer.appendChild(createUpcomingMeetingCard(meeting));
       });
     }
+  };
 
-    // Handle refresh button
-    const refreshBtn = document.getElementById('refreshMeetings');
-    if (refreshBtn) {
-      refreshBtn.addEventListener('click', async () => {
-        const originalHTML = refreshBtn.innerHTML;
-        const previousMeetingsCount = calendarMeetings.length;
+  // Initially show first 4 meetings or empty state
+  renderUpcomingMeetings(weekMeetings.slice(0, 4));
 
-        refreshBtn.disabled = true;
-        refreshBtn.style.opacity = '0.5';
-        refreshBtn.innerHTML = `
+  // Handle show more button
+  if (weekMeetings.length > 4) {
+    const showMoreBtn = document.getElementById('showMoreUpcoming');
+    showMoreBtn.addEventListener('click', () => {
+      showingAll = !showingAll;
+      if (showingAll) {
+        renderUpcomingMeetings(weekMeetings);
+        showMoreBtn.textContent = 'Show less';
+      } else {
+        renderUpcomingMeetings(weekMeetings.slice(0, 4));
+        showMoreBtn.textContent = 'Show more';
+      }
+    });
+  }
+
+  // Handle refresh button
+  const refreshBtn = document.getElementById('refreshMeetings');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', async () => {
+      const originalHTML = refreshBtn.innerHTML;
+      const previousMeetingsCount = calendarMeetings.length;
+
+      refreshBtn.disabled = true;
+      refreshBtn.style.opacity = '0.5';
+      refreshBtn.innerHTML = `
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite;">
             <style>@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }</style>
             <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
           </svg>
         `;
 
-        // Fetch latest calendar meetings
-        await fetchCalendarMeetings();
+      // Fetch latest calendar meetings
+      await fetchCalendarMeetings();
 
-        // Get IDs of current calendar meetings from API
-        const currentCalendarIds = new Set(calendarMeetings.map(m => m.id));
-        console.log('Current calendar meeting IDs from API:', Array.from(currentCalendarIds));
+      // Get IDs of current calendar meetings from API
+      const currentCalendarIds = new Set(calendarMeetings.map((m) => m.id));
+      console.log(
+        'Current calendar meeting IDs from API:',
+        Array.from(currentCalendarIds),
+      );
 
-        // Remove calendar meetings from local storage that no longer exist in API
-        // Only remove calendar-type meetings that don't have content/notes
-        const calendarMeetingsToRemove = [];
+      // Remove calendar meetings from local storage that no longer exist in API
+      // Only remove calendar-type meetings that don't have content/notes
+      const calendarMeetingsToRemove = [];
 
-        upcomingMeetings.forEach((meeting, index) => {
-          // Check using calendarEventId since that's what matches the API
-          if (meeting.type === 'calendar' && meeting.calendarEventId && !currentCalendarIds.has(meeting.calendarEventId)) {
-            // Only remove if it doesn't have any content (transcript, notes, etc.)
-            if (!meeting.transcript?.length && !meeting.content && !meeting.personalNotes) {
-              console.log('Marking for removal from upcoming:', meeting.title, meeting.calendarEventId);
-              calendarMeetingsToRemove.push({ array: upcomingMeetings, index, meeting });
-            }
+      upcomingMeetings.forEach((meeting, index) => {
+        // Check using calendarEventId since that's what matches the API
+        if (
+          meeting.type === 'calendar' &&
+          meeting.calendarEventId &&
+          !currentCalendarIds.has(meeting.calendarEventId)
+        ) {
+          // Only remove if it doesn't have any content (transcript, notes, etc.)
+          if (
+            !meeting.transcript?.length &&
+            !meeting.content &&
+            !meeting.personalNotes
+          ) {
+            console.log(
+              'Marking for removal from upcoming:',
+              meeting.title,
+              meeting.calendarEventId,
+            );
+            calendarMeetingsToRemove.push({
+              array: upcomingMeetings,
+              index,
+              meeting,
+            });
           }
-        });
-
-        pastMeetings.forEach((meeting, index) => {
-          // Check using calendarEventId since that's what matches the API
-          if (meeting.type === 'calendar' && meeting.calendarEventId && !currentCalendarIds.has(meeting.calendarEventId)) {
-            // Only remove if it doesn't have any content (transcript, notes, etc.)
-            if (!meeting.transcript?.length && !meeting.content && !meeting.personalNotes) {
-              console.log('Marking for removal from past:', meeting.title, meeting.calendarEventId);
-              calendarMeetingsToRemove.push({ array: pastMeetings, index, meeting });
-            }
-          }
-        });
-
-        // Remove meetings from arrays (reverse order to maintain indices)
-        calendarMeetingsToRemove.reverse().forEach(({ array, index }) => {
-          array.splice(index, 1);
-        });
-
-        // Update meetingsData to reflect removals
-        meetingsData.upcomingMeetings = [...upcomingMeetings];
-        meetingsData.pastMeetings = [...pastMeetings];
-
-        // Save to file if we removed any meetings
-        if (calendarMeetingsToRemove.length > 0) {
-          await window.electronAPI.saveMeetingsData(meetingsData);
-          console.log(`Removed ${calendarMeetingsToRemove.length} obsolete calendar meetings`);
         }
-
-        // Re-render meetings
-        renderMeetings();
-
-        const newMeetingsCount = calendarMeetings.length - previousMeetingsCount;
-        const removedCount = calendarMeetingsToRemove.length;
-
-        let message = '';
-        if (newMeetingsCount > 0 && removedCount > 0) {
-          message = `${newMeetingsCount} new, ${removedCount} removed`;
-        } else if (newMeetingsCount > 0) {
-          message = `${newMeetingsCount} new meeting${newMeetingsCount > 1 ? 's' : ''}`;
-        } else if (removedCount > 0) {
-          message = `${removedCount} meeting${removedCount > 1 ? 's' : ''} removed`;
-        } else {
-          message = 'Up to date';
-        }
-
-        // Show toast notification
-        showToast(message, 'success');
-
-        refreshBtn.innerHTML = `<span style="font-size: 11px;">${message}</span>`;
-        refreshBtn.disabled = false;
-        refreshBtn.style.opacity = '1';
-
-        setTimeout(() => {
-          refreshBtn.innerHTML = originalHTML;
-        }, 2000);
       });
-    }
+
+      pastMeetings.forEach((meeting, index) => {
+        // Check using calendarEventId since that's what matches the API
+        if (
+          meeting.type === 'calendar' &&
+          meeting.calendarEventId &&
+          !currentCalendarIds.has(meeting.calendarEventId)
+        ) {
+          // Only remove if it doesn't have any content (transcript, notes, etc.)
+          if (
+            !meeting.transcript?.length &&
+            !meeting.content &&
+            !meeting.personalNotes
+          ) {
+            console.log(
+              'Marking for removal from past:',
+              meeting.title,
+              meeting.calendarEventId,
+            );
+            calendarMeetingsToRemove.push({
+              array: pastMeetings,
+              index,
+              meeting,
+            });
+          }
+        }
+      });
+
+      // Remove meetings from arrays (reverse order to maintain indices)
+      calendarMeetingsToRemove.reverse().forEach(({ array, index }) => {
+        array.splice(index, 1);
+      });
+
+      // Update meetingsData to reflect removals
+      meetingsData.upcomingMeetings = [...upcomingMeetings];
+      meetingsData.pastMeetings = [...pastMeetings];
+
+      // Save to file if we removed any meetings
+      if (calendarMeetingsToRemove.length > 0) {
+        await window.electronAPI.saveMeetingsData(meetingsData);
+        console.log(
+          `Removed ${calendarMeetingsToRemove.length} obsolete calendar meetings`,
+        );
+      }
+
+      // Re-render meetings
+      renderMeetings();
+
+      const newMeetingsCount = calendarMeetings.length - previousMeetingsCount;
+      const removedCount = calendarMeetingsToRemove.length;
+
+      let message = '';
+      if (newMeetingsCount > 0 && removedCount > 0) {
+        message = `${newMeetingsCount} new, ${removedCount} removed`;
+      } else if (newMeetingsCount > 0) {
+        message = `${newMeetingsCount} new meeting${newMeetingsCount > 1 ? 's' : ''}`;
+      } else if (removedCount > 0) {
+        message = `${removedCount} meeting${removedCount > 1 ? 's' : ''} removed`;
+      } else {
+        message = 'Up to date';
+      }
+
+      // Show toast notification
+      showToast(message, 'success');
+
+      refreshBtn.innerHTML = `<span style="font-size: 11px;">${message}</span>`;
+      refreshBtn.disabled = false;
+      refreshBtn.style.opacity = '1';
+
+      setTimeout(() => {
+        refreshBtn.innerHTML = originalHTML;
+      }, 2000);
+    });
   }
 
   // Group notes by date (all past meetings, regardless of type)
   const notesByDate = {};
-  const now = new Date();
   const allNotes = pastMeetings
-    .filter(meeting => {
+    .filter((meeting) => {
       // Calculate if meeting is in the future based on endTime or startTime
       if (meeting.endTime) {
         return new Date(meeting.endTime) <= now;
@@ -2266,7 +2382,7 @@ function renderMeetings() {
     .sort((a, b) => new Date(b.date) - new Date(a.date));
 
   // Group meetings by date
-  allNotes.forEach(meeting => {
+  allNotes.forEach((meeting) => {
     const dateKey = formatDateHeader(meeting.date);
     if (!notesByDate[dateKey]) {
       notesByDate[dateKey] = [];
@@ -2289,7 +2405,7 @@ function renderMeetings() {
     const meetingsList = document.createElement('div');
     meetingsList.className = 'date-meetings-list';
 
-    meetings.forEach(meeting => {
+    meetings.forEach((meeting) => {
       meetingsList.appendChild(createMeetingCardWithTime(meeting));
     });
 
@@ -2300,15 +2416,21 @@ function renderMeetings() {
 
 // Load meetings data from file
 async function loadMeetingsDataFromFile() {
-  console.log("Loading meetings data from file...");
+  console.log('Loading meetings data from file...');
   try {
     const result = await window.electronAPI.loadMeetingsData();
-    console.log("Load result success:", result.success);
+    console.log('Load result success:', result.success);
 
     if (result.success) {
-      console.log(`Got data with ${result.data.pastMeetings?.length || 0} past meetings`);
+      console.log(
+        `Got data with ${result.data.pastMeetings?.length || 0} past meetings`,
+      );
       if (result.data.pastMeetings && result.data.pastMeetings.length > 0) {
-        console.log("Most recent meeting:", result.data.pastMeetings[0].id, result.data.pastMeetings[0].title);
+        console.log(
+          'Most recent meeting:',
+          result.data.pastMeetings[0].id,
+          result.data.pastMeetings[0].title,
+        );
       }
 
       // Initialize arrays if they don't exist in the loaded data
@@ -2327,24 +2449,36 @@ async function loadMeetingsDataFromFile() {
       upcomingMeetings.length = 0;
       pastMeetings.length = 0;
 
-      console.log("Before updating arrays, pastMeetings count:", pastMeetings.length);
+      console.log(
+        'Before updating arrays, pastMeetings count:',
+        pastMeetings.length,
+      );
 
       // Copy all meetings to the arrays (including calendar-created notes)
       // We want to keep calendar-created notes as they can have transcripts
-      meetingsData.upcomingMeetings
-        .forEach(meeting => upcomingMeetings.push(meeting));
+      meetingsData.upcomingMeetings.forEach((meeting) => {
+        upcomingMeetings.push(meeting);
+      });
 
-      meetingsData.pastMeetings
-        .forEach(meeting => pastMeetings.push(meeting));
+      meetingsData.pastMeetings.forEach((meeting) => {
+        pastMeetings.push(meeting);
+      });
 
-      console.log("After updating arrays, pastMeetings count:", pastMeetings.length);
+      console.log(
+        'After updating arrays, pastMeetings count:',
+        pastMeetings.length,
+      );
       if (pastMeetings.length > 0) {
-        console.log("First past meeting:", pastMeetings[0].id, pastMeetings[0].title);
+        console.log(
+          'First past meeting:',
+          pastMeetings[0].id,
+          pastMeetings[0].title,
+        );
       }
 
       // Regroup past meetings by date
       pastMeetingsByDate = {};
-      meetingsData.pastMeetings.forEach(meeting => {
+      meetingsData.pastMeetings.forEach((meeting) => {
         const dateKey = formatDateHeader(meeting.date);
         if (!pastMeetingsByDate[dateKey]) {
           pastMeetingsByDate[dateKey] = [];
@@ -2380,7 +2514,9 @@ function updateDebugTranscript(transcript) {
   }
 
   // Check if user was at bottom before clearing content
-  const wasAtBottom = transcriptContent.scrollTop + transcriptContent.clientHeight >= transcriptContent.scrollHeight - 5;
+  const wasAtBottom =
+    transcriptContent.scrollTop + transcriptContent.clientHeight >=
+    transcriptContent.scrollHeight - 5;
 
   // Clear previous content
   transcriptContent.innerHTML = '';
@@ -2406,7 +2542,11 @@ function updateDebugTranscript(transcript) {
 
     // Format timestamp
     const timestamp = new Date(entry.timestamp);
-    const formattedTime = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const formattedTime = timestamp.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
 
     // Create HTML for this entry
     entryDiv.innerHTML = `
@@ -2450,9 +2590,12 @@ function updateDebugVideoPreview(frameData) {
 
   // Make sure debug panel toggle shows new content notification if panel is closed
   const debugPanel = document.getElementById('debugPanel');
-  if (debugPanel && debugPanel.classList.contains('hidden')) {
+  if (debugPanel?.classList.contains('hidden')) {
     const debugPanelToggle = document.getElementById('debugPanelToggle');
-    if (debugPanelToggle && !debugPanelToggle.classList.contains('has-new-content')) {
+    if (
+      debugPanelToggle &&
+      !debugPanelToggle.classList.contains('has-new-content')
+    ) {
       debugPanelToggle.classList.add('has-new-content');
     }
   }
@@ -2466,7 +2609,9 @@ function updateParticipantVideoPreview(frameData) {
   const { buffer, participantId, participantName } = frameData;
 
   // Check if we already have a container for this participant
-  let participantVideoContainer = document.getElementById(`video-participant-${participantId}`);
+  let participantVideoContainer = document.getElementById(
+    `video-participant-${participantId}`,
+  );
 
   // If no container exists, create one
   if (!participantVideoContainer) {
@@ -2517,7 +2662,9 @@ function updateScreensharePreview(frameData) {
   const { buffer, participantId } = frameData;
 
   // Check if we already have a container for this screenshare
-  let screenshareContainer = document.getElementById(`screenshare-participant-${participantId}`);
+  let screenshareContainer = document.getElementById(
+    `screenshare-participant-${participantId}`,
+  );
 
   // If no container exists, create one
   if (!screenshareContainer) {
@@ -2548,7 +2695,9 @@ function updateScreensharePreview(frameData) {
   }
 
   // Update the image with the new frame
-  const screenshareImg = document.getElementById(`screenshare-frame-${participantId}`);
+  const screenshareImg = document.getElementById(
+    `screenshare-frame-${participantId}`,
+  );
   if (screenshareImg) {
     screenshareImg.src = `data:image/png;base64,${buffer}`;
   }
@@ -2577,7 +2726,7 @@ function updateDebugParticipants(participants) {
   participantsList.className = 'participants-list';
 
   // Add each participant
-  participants.forEach(participant => {
+  participants.forEach((participant) => {
     const participantDiv = document.createElement('div');
     participantDiv.className = 'participant-entry';
 
@@ -2611,7 +2760,9 @@ function initDebugPanel() {
       // Toggle the debug panel visibility
       if (debugPanel.classList.contains('hidden')) {
         debugPanel.classList.remove('hidden');
-        document.querySelector('.app-container').classList.add('debug-panel-open');
+        document
+          .querySelector('.app-container')
+          .classList.add('debug-panel-open');
 
         // Update the toggle button position and remove any notification indicators
         debugPanelToggle.style.right = '50%';
@@ -2624,14 +2775,17 @@ function initDebugPanel() {
 
         // If there's an active meeting, refresh the debug panels with latest data
         if (currentEditingMeetingId) {
-          const meeting = [...upcomingMeetings, ...pastMeetings].find(m => m.id === currentEditingMeetingId);
+          const meeting = [...upcomingMeetings, ...pastMeetings].find(
+            (m) => m.id === currentEditingMeetingId,
+          );
           if (meeting) {
             // Update transcript if available
             if (meeting.transcript && meeting.transcript.length > 0) {
               updateDebugTranscript(meeting.transcript);
             } else {
               // Clear transcript area if no transcript
-              const transcriptContent = document.getElementById('transcriptContent');
+              const transcriptContent =
+                document.getElementById('transcriptContent');
               if (transcriptContent) {
                 transcriptContent.innerHTML = `
                   <div class="placeholder-content">
@@ -2646,7 +2800,9 @@ function initDebugPanel() {
               updateDebugParticipants(meeting.participants);
             } else {
               // Clear participants area if no participants
-              const participantsContent = document.getElementById('participantsContent');
+              const participantsContent = document.getElementById(
+                'participantsContent',
+              );
               if (participantsContent) {
                 participantsContent.innerHTML = `
                   <div class="placeholder-content">
@@ -2672,7 +2828,9 @@ function initDebugPanel() {
         }
       } else {
         debugPanel.classList.add('hidden');
-        document.querySelector('.app-container').classList.remove('debug-panel-open');
+        document
+          .querySelector('.app-container')
+          .classList.remove('debug-panel-open');
 
         // Reset the toggle button position
         debugPanelToggle.style.right = '0';
@@ -2699,19 +2857,21 @@ function initDebugPanel() {
 
         if (result.details && Array.isArray(result.details)) {
           // Display detailed results
-          notifTestResult.innerHTML += result.details.map(line => {
-            // Add some formatting for better readability
-            if (line.startsWith('✅')) {
-              return `<span style="color: green;">${line}</span>`;
-            } else if (line.startsWith('❌')) {
-              return `<span style="color: red;">${line}</span>`;
-            } else if (line.startsWith('⚠️')) {
-              return `<span style="color: orange;">${line}</span>`;
-            } else if (line.startsWith('📋')) {
-              return `<strong>${line}</strong>`;
-            }
-            return line;
-          }).join('<br>') + '<br>';
+          notifTestResult.innerHTML += `${result.details
+            .map((line) => {
+              // Add some formatting for better readability
+              if (line.startsWith('✅')) {
+                return `<span style="color: green;">${line}</span>`;
+              } else if (line.startsWith('❌')) {
+                return `<span style="color: red;">${line}</span>`;
+              } else if (line.startsWith('⚠️')) {
+                return `<span style="color: orange;">${line}</span>`;
+              } else if (line.startsWith('📋')) {
+                return `<strong>${line}</strong>`;
+              }
+              return line;
+            })
+            .join('<br>')}<br>`;
         } else {
           notifTestResult.innerHTML += `Result: ${JSON.stringify(result, null, 2)}<br>`;
         }
@@ -2778,7 +2938,9 @@ function initDebugPanel() {
     closeDebugPanelBtn.addEventListener('click', () => {
       debugPanel.classList.add('hidden');
       // Restore the editorView to full width
-      document.querySelector('.app-container').classList.remove('debug-panel-open');
+      document
+        .querySelector('.app-container')
+        .classList.remove('debug-panel-open');
 
       // Reset the toggle button position and icon
       const debugPanelToggle = document.getElementById('debugPanelToggle');
@@ -2810,7 +2972,7 @@ const sdkLogger = {
   // Initialize the logger
   init() {
     // Listen for logs from the main process
-    window.sdkLoggerBridge?.onSdkLog(logEntry => {
+    window.sdkLoggerBridge?.onSdkLog((logEntry) => {
       // Add an origin flag to logs created in this renderer to prevent duplicates
       if (!logEntry.originatedFromRenderer) {
         this.addLogEntry(logEntry);
@@ -2827,7 +2989,7 @@ const sdkLogger = {
       type: 'api-call',
       method,
       params,
-      timestamp: new Date()
+      timestamp: new Date(),
     };
 
     // Send to main process
@@ -2843,7 +3005,7 @@ const sdkLogger = {
       type: 'event',
       eventType,
       data,
-      timestamp: new Date()
+      timestamp: new Date(),
     };
 
     // Send to main process
@@ -2859,7 +3021,7 @@ const sdkLogger = {
       type: 'error',
       errorType,
       message,
-      timestamp: new Date()
+      timestamp: new Date(),
     };
 
     // Send to main process
@@ -2874,7 +3036,7 @@ const sdkLogger = {
     const logEntry = {
       type: level,
       message,
-      timestamp: new Date()
+      timestamp: new Date(),
     };
 
     // Send to main process
@@ -2911,7 +3073,11 @@ const sdkLogger = {
 
       const timestamp = document.createElement('div');
       timestamp.className = 'timestamp';
-      timestamp.textContent = this.formatTimestamp(entry.timestamp instanceof Date ? entry.timestamp : new Date(entry.timestamp));
+      timestamp.textContent = this.formatTimestamp(
+        entry.timestamp instanceof Date
+          ? entry.timestamp
+          : new Date(entry.timestamp),
+      );
       logElement.appendChild(timestamp);
 
       // Format content based on log type
@@ -2972,7 +3138,7 @@ const sdkLogger = {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
-      fractionalSecondDigits: 3
+      fractionalSecondDigits: 3,
     });
   },
 
@@ -2987,10 +3153,10 @@ const sdkLogger = {
         .replace(/'/g, '&#039;')
         .replace(/\n/g, '<br>')
         .replace(/ /g, '&nbsp;');
-    } catch (e) {
+    } catch {
       return String(params);
     }
-  }
+  },
 };
 
 // Global transcript service instance
@@ -3011,7 +3177,14 @@ function initVideoSection() {
 
 // Load video for meeting
 function loadMeetingVideo(meeting) {
-  console.log('loadMeetingVideo called for meeting:', meeting.id, 'videoPath:', meeting.videoPath, 'recallVideoUrl:', meeting.recallVideoUrl);
+  console.log(
+    'loadMeetingVideo called for meeting:',
+    meeting.id,
+    'videoPath:',
+    meeting.videoPath,
+    'recallVideoUrl:',
+    meeting.recallVideoUrl,
+  );
   const videoSection = document.getElementById('videoSection');
   const videoSource = document.getElementById('videoSource');
   const meetingVideo = document.getElementById('meetingVideo');
@@ -3034,18 +3207,26 @@ function loadMeetingVideo(meeting) {
     meetingVideo.load();
 
     // Update duration when metadata loads
-    meetingVideo.addEventListener('loadedmetadata', () => {
-      const duration = meetingVideo.duration;
-      const minutes = Math.floor(duration / 60);
-      const seconds = Math.floor(duration % 60);
-      videoDuration.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    }, { once: true });
+    meetingVideo.addEventListener(
+      'loadedmetadata',
+      () => {
+        const duration = meetingVideo.duration;
+        const minutes = Math.floor(duration / 60);
+        const seconds = Math.floor(duration % 60);
+        videoDuration.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+      },
+      { once: true },
+    );
 
     // Handle video errors
-    meetingVideo.addEventListener('error', (e) => {
-      console.error('Video loading error:', e, meetingVideo.error);
-      videoSection.style.display = 'none';
-    }, { once: true });
+    meetingVideo.addEventListener(
+      'error',
+      (e) => {
+        console.error('Video loading error:', e, meetingVideo.error);
+        videoSection.style.display = 'none';
+      },
+      { once: true },
+    );
   }
   // Fallback to local video path if no Recall URL
   else if (meeting.videoPath) {
@@ -3055,32 +3236,43 @@ function loadMeetingVideo(meeting) {
     console.log('Loading video from local path:', meeting.videoPath);
 
     // Load video through IPC to get base64 data URL
-    window.electronAPI.getVideoFile(meeting.videoPath).then(result => {
-      if (result.success && result.dataUrl) {
-        videoSource.src = result.dataUrl;
-        meetingVideo.load();
+    window.electronAPI
+      .getVideoFile(meeting.videoPath)
+      .then((result) => {
+        if (result.success && result.dataUrl) {
+          videoSource.src = result.dataUrl;
+          meetingVideo.load();
 
-        // Update duration when metadata loads
-        meetingVideo.addEventListener('loadedmetadata', () => {
-          const duration = meetingVideo.duration;
-          const minutes = Math.floor(duration / 60);
-          const seconds = Math.floor(duration % 60);
-          videoDuration.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-        }, { once: true });
-      } else {
-        console.error('Failed to load video:', result.error);
+          // Update duration when metadata loads
+          meetingVideo.addEventListener(
+            'loadedmetadata',
+            () => {
+              const duration = meetingVideo.duration;
+              const minutes = Math.floor(duration / 60);
+              const seconds = Math.floor(duration % 60);
+              videoDuration.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            },
+            { once: true },
+          );
+        } else {
+          console.error('Failed to load video:', result.error);
+          videoSection.style.display = 'none';
+        }
+      })
+      .catch((error) => {
+        console.error('Error loading video file:', error);
         videoSection.style.display = 'none';
-      }
-    }).catch(error => {
-      console.error('Error loading video file:', error);
-      videoSection.style.display = 'none';
-    });
+      });
 
     // Handle video errors
-    meetingVideo.addEventListener('error', (e) => {
-      console.error('Video loading error:', e, meetingVideo.error);
-      videoSection.style.display = 'none';
-    }, { once: true });
+    meetingVideo.addEventListener(
+      'error',
+      (e) => {
+        console.error('Video loading error:', e, meetingVideo.error);
+        videoSection.style.display = 'none';
+      },
+      { once: true },
+    );
   } else {
     // Hide video section if no recording
     videoSection.style.display = 'none';
@@ -3097,13 +3289,17 @@ function initTabbedEditor() {
     return;
   }
 
-  tabButtons.forEach(button => {
+  tabButtons.forEach((button) => {
     button.addEventListener('click', () => {
       const targetTab = button.getAttribute('data-tab');
 
       // Remove active class from all buttons and contents
-      tabButtons.forEach(btn => btn.classList.remove('active'));
-      tabContents.forEach(content => content.classList.remove('active'));
+      tabButtons.forEach((btn) => {
+        btn.classList.remove('active');
+      });
+      tabContents.forEach((content) => {
+        content.classList.remove('active');
+      });
 
       // Add active class to clicked button and corresponding content
       button.classList.add('active');
@@ -3120,13 +3316,14 @@ function initTabbedEditor() {
   initVideoSection();
 }
 
-
 // Initialize sidebar functionality
 function initMeetingSidebar() {
   const sidebar = document.getElementById('meetingSidebar');
   const toggleBtn = document.getElementById('sidebarToggleBtn');
   const copyTextBtn = document.getElementById('copyTextBtn');
-  const downloadTranscriptBtn = document.getElementById('downloadTranscriptBtn');
+  const downloadTranscriptBtn = document.getElementById(
+    'downloadTranscriptBtn',
+  );
 
   if (!sidebar || !toggleBtn) return;
 
@@ -3157,19 +3354,21 @@ function initMeetingSidebar() {
   if (copyTextBtn) {
     copyTextBtn.addEventListener('click', async () => {
       // Get content from tabbed editor
-      const personalNotesEditor = document.getElementById('personal-notes-editor');
+      const personalNotesEditor = document.getElementById(
+        'personal-notes-editor',
+      );
       const aiSummaryEditor = document.getElementById('ai-summary-editor');
 
       let notesContent = '';
 
       // Combine personal notes and AI summary
-      if (personalNotesEditor && personalNotesEditor.value) {
+      if (personalNotesEditor?.value) {
         notesContent += personalNotesEditor.value;
       }
 
-      if (aiSummaryEditor && aiSummaryEditor.value) {
+      if (aiSummaryEditor?.value) {
         if (notesContent) notesContent += '\n\n---\n\n';
-        notesContent += 'AI SUMMARY:\n\n' + aiSummaryEditor.value;
+        notesContent += `AI SUMMARY:\n\n${aiSummaryEditor.value}`;
       }
 
       if (notesContent) {
@@ -3188,8 +3387,10 @@ function initMeetingSidebar() {
   // Download transcript functionality
   if (downloadTranscriptBtn) {
     downloadTranscriptBtn.addEventListener('click', () => {
-      const meeting = [...upcomingMeetings, ...pastMeetings].find(m => m.id === currentEditingMeetingId);
-      if (meeting && meeting.title) {
+      const meeting = [...upcomingMeetings, ...pastMeetings].find(
+        (m) => m.id === currentEditingMeetingId,
+      );
+      if (meeting?.title) {
         const filename = `transcript-${meeting.title.replace(/[^a-z0-9]/gi, '_')}.txt`;
         transcriptService.downloadTranscript(filename);
         showToast('Transcript downloaded!');
@@ -3202,7 +3403,7 @@ function initMeetingSidebar() {
 }
 
 // Update transcript buttons visibility
-window.updateTranscriptButtons = function(hasTranscript) {
+window.updateTranscriptButtons = (hasTranscript) => {
   const downloadBtn = document.getElementById('downloadTranscriptBtn');
   if (downloadBtn) {
     downloadBtn.style.display = hasTranscript ? 'flex' : 'none';
@@ -3294,13 +3495,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Fetch calendar meetings initially and every 5 minutes
-  setInterval(() => {
-    fetchCalendarMeetings();
-    fetchPastMeetings();
-  }, 5 * 60 * 1000);
-
-  // Track if we've shown notification for current meeting
-  let lastNotificationShown = false;
+  setInterval(
+    () => {
+      fetchCalendarMeetings();
+      fetchPastMeetings();
+    },
+    5 * 60 * 1000,
+  );
 
   // Listen for meeting detection status updates
   window.electronAPI.onMeetingDetectionStatus((data) => {
@@ -3318,7 +3519,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Only update button state if we're in the home view
-    const inHomeView = document.getElementById('homeView').style.display !== 'none';
+    const inHomeView =
+      document.getElementById('homeView').style.display !== 'none';
     if (inHomeView) {
       updateRecordButtonState();
     }
@@ -3333,10 +3535,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       console.log('Data refreshed, checking for meeting ID:', meetingId);
 
       // Log the list of available meeting IDs to help with debugging
-      console.log('Available meeting IDs:', pastMeetings.map(m => m.id));
+      console.log(
+        'Available meeting IDs:',
+        pastMeetings.map((m) => m.id),
+      );
 
       // Verify the meeting exists in our data
-      const meeting = [...upcomingMeetings, ...pastMeetings].find(m => m.id === meetingId);
+      const meeting = [...upcomingMeetings, ...pastMeetings].find(
+        (m) => m.id === meetingId,
+      );
 
       if (meeting) {
         console.log('Found meeting to open:', meeting.title);
@@ -3349,13 +3556,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         setTimeout(() => {
           console.log('Retrying data load after delay...');
           loadMeetingsDataFromFile().then(() => {
-            const retryMeeting = [...upcomingMeetings, ...pastMeetings].find(m => m.id === meetingId);
+            const retryMeeting = [...upcomingMeetings, ...pastMeetings].find(
+              (m) => m.id === meetingId,
+            );
             if (retryMeeting) {
-              console.log('Found meeting on second attempt:', retryMeeting.title);
+              console.log(
+                'Found meeting on second attempt:',
+                retryMeeting.title,
+              );
               showEditorView(meetingId);
             } else {
-              console.error('Meeting still not found after retry. Available meetings:',
-                pastMeetings.map(m => `${m.id}: ${m.title}`));
+              console.error(
+                'Meeting still not found after retry. Available meetings:',
+                pastMeetings.map((m) => `${m.id}: ${m.title}`),
+              );
             }
           });
         }, 1500);
@@ -3365,14 +3579,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Listen for calendar meeting notifications (from "Start Recording" button on calendar notifications)
   window.electronAPI.onOpenCalendarMeeting(async (meetingData) => {
-    console.log('Received request to open calendar meeting from notification:', meetingData);
+    console.log(
+      'Received request to open calendar meeting from notification:',
+      meetingData,
+    );
 
     // Ensure we have the latest data
     await loadMeetingsDataFromFile();
 
     // Check if a note already exists for this meeting
-    let existingNote = [...pastMeetings, ...upcomingMeetings].find(m =>
-      m.id === meetingData.id || m.calendarEventId === meetingData.id
+    let existingNote = [...pastMeetings, ...upcomingMeetings].find(
+      (m) => m.id === meetingData.id || m.calendarEventId === meetingData.id,
     );
 
     if (!existingNote) {
@@ -3390,7 +3607,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         attendees: meetingData.attendees || [],
         location: meetingData.location,
         videoMeetingUrl: meetingData.videoMeetingUrl,
-        isFuture: true // Mark as future meeting
+        isFuture: true, // Mark as future meeting
       };
 
       // Add to upcomingMeetings (not pastMeetings for future meetings)
@@ -3428,10 +3645,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (currentEditingMeetingId === meetingId) {
       loadMeetingsDataFromFile().then(() => {
         // Refresh the editor with the updated content
-        const meeting = [...upcomingMeetings, ...pastMeetings].find(m => m.id === meetingId);
+        const meeting = [...upcomingMeetings, ...pastMeetings].find(
+          (m) => m.id === meetingId,
+        );
         if (meeting) {
           // Update personal notes if available
-          const personalNotesEditor = document.getElementById('personal-notes-editor');
+          const personalNotesEditor = document.getElementById(
+            'personal-notes-editor',
+          );
           if (personalNotesEditor && meeting.personalNotes) {
             personalNotesEditor.value = meeting.personalNotes;
           }
@@ -3456,12 +3677,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Listen for video URL updates from backend (when Recall upload completes)
   window.electronAPI.onVideoUrlUpdated((data) => {
-    console.log('Video URL updated for meeting:', data.meetingId, 'URL:', data.videoUrl);
+    console.log(
+      'Video URL updated for meeting:',
+      data.meetingId,
+      'URL:',
+      data.videoUrl,
+    );
 
     // If this is the currently edited meeting, reload and refresh video
     if (currentEditingMeetingId === data.meetingId) {
       loadMeetingsDataFromFile().then(() => {
-        const meeting = [...upcomingMeetings, ...pastMeetings].find(m => m.id === data.meetingId);
+        const meeting = [...upcomingMeetings, ...pastMeetings].find(
+          (m) => m.id === data.meetingId,
+        );
         if (meeting) {
           console.log('Refreshing video player with Recall URL');
           loadMeetingVideo(meeting);
@@ -3504,18 +3732,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     const meetingSidebar = document.getElementById('meetingSidebar');
     const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
 
-    if (meetingSidebar && sidebarToggleBtn && meetingSidebar.classList.contains('collapsed')) {
+    if (
+      meetingSidebar &&
+      sidebarToggleBtn &&
+      meetingSidebar.classList.contains('collapsed')
+    ) {
       console.log('✅ Clicking sidebar toggle to expand');
       sidebarToggleBtn.click();
     }
 
     // Only update meeting data if this is the currently edited meeting
     if (currentEditingMeetingId === meetingId) {
-
       // Reload the meeting data to get the final summary
       loadMeetingsDataFromFile().then(() => {
-        const meeting = [...upcomingMeetings, ...pastMeetings].find(m => m.id === meetingId);
-        if (meeting && meeting.aiSummary) {
+        const meeting = [...upcomingMeetings, ...pastMeetings].find(
+          (m) => m.id === meetingId,
+        );
+        if (meeting?.aiSummary) {
           const aiSummaryEditor = document.getElementById('ai-summary-editor');
           if (aiSummaryEditor) {
             aiSummaryEditor.value = meeting.aiSummary;
@@ -3529,7 +3762,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.electronAPI.onVideoFrame((data) => {
     // Only handle video frames for the currently open meeting
     if (data.noteId === currentEditingMeetingId) {
-      console.log(`Video frame received for participant: ${data.participantName}`);
+      console.log(
+        `Video frame received for participant: ${data.participantName}`,
+      );
 
       // Update the video preview in the debug panel
       updateDebugVideoPreview(data);
@@ -3544,10 +3779,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     // and update the debug panel's participants section
     if (currentEditingMeetingId === meetingId) {
       loadMeetingsDataFromFile().then(() => {
-        const meeting = [...upcomingMeetings, ...pastMeetings].find(m => m.id === meetingId);
-        if (meeting && meeting.participants && meeting.participants.length > 0) {
+        const meeting = [...upcomingMeetings, ...pastMeetings].find(
+          (m) => m.id === meetingId,
+        );
+        if (
+          meeting &&
+          meeting.participants &&
+          meeting.participants.length > 0
+        ) {
           // Log the latest participant
-          const latestParticipant = meeting.participants[meeting.participants.length - 1];
+          const latestParticipant =
+            meeting.participants[meeting.participants.length - 1];
           console.log(`Participant updated: ${latestParticipant.name}`);
 
           // Update the participants area in the debug panel
@@ -3556,14 +3798,16 @@ document.addEventListener('DOMContentLoaded', async () => {
           // Show notification about new participant if debug panel is closed
           const debugPanel = document.getElementById('debugPanel');
           if (debugPanel && debugPanel.classList.contains('hidden')) {
-            const debugPanelToggle = document.getElementById('debugPanelToggle');
+            const debugPanelToggle =
+              document.getElementById('debugPanelToggle');
             if (debugPanelToggle) {
               // Add pulse effect to show there's new content
               debugPanelToggle.classList.add('has-new-content');
 
               // Create a mini notification for participant join
               const miniNotification = document.createElement('div');
-              miniNotification.className = 'debug-notification participant-notification';
+              miniNotification.className =
+                'debug-notification participant-notification';
               miniNotification.innerHTML = `
                 <span class="debug-notification-title">New Participant:</span>
                 <span class="debug-notification-name">${latestParticipant.name || 'Unknown'}</span>
@@ -3594,11 +3838,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     // and update the debug panel's transcript section
     if (currentEditingMeetingId === meetingId) {
       loadMeetingsDataFromFile().then(() => {
-        const meeting = [...upcomingMeetings, ...pastMeetings].find(m => m.id === meetingId);
+        const meeting = [...upcomingMeetings, ...pastMeetings].find(
+          (m) => m.id === meetingId,
+        );
         if (meeting && meeting.transcript && meeting.transcript.length > 0) {
           // Log the latest transcript entry
           const latestEntry = meeting.transcript[meeting.transcript.length - 1];
-          console.log(`Latest transcript: ${latestEntry.speaker}: "${latestEntry.text}"`);
+          console.log(
+            `Latest transcript: ${latestEntry.speaker}: "${latestEntry.text}"`,
+          );
 
           // Update the live transcript in the sidebar
           updateLiveTranscript(meeting.transcript);
@@ -3609,7 +3857,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           // Show notification about new transcript if debug panel is closed
           const debugPanel = document.getElementById('debugPanel');
           if (debugPanel && debugPanel.classList.contains('hidden')) {
-            const debugPanelToggle = document.getElementById('debugPanelToggle');
+            const debugPanelToggle =
+              document.getElementById('debugPanelToggle');
             if (debugPanelToggle) {
               // Add pulse effect to show there's new content
               debugPanelToggle.classList.add('has-new-content');
@@ -3617,7 +3866,8 @@ document.addEventListener('DOMContentLoaded', async () => {
               // Create a mini notification if we're recording
               if (window.isRecording) {
                 const miniNotification = document.createElement('div');
-                miniNotification.className = 'debug-notification transcript-notification';
+                miniNotification.className =
+                  'debug-notification transcript-notification';
                 miniNotification.innerHTML = `
                   <span class="debug-notification-speaker">${latestEntry.speaker || 'Unknown'}</span>:
                   <span class="debug-notification-text">${latestEntry.text.slice(0, 40)}${latestEntry.text.length > 40 ? '...' : ''}</span>
@@ -3650,14 +3900,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Expand sidebar when summary is generated
       const sidebar = document.getElementById('sidebar');
       const editorContent = document.querySelector('.editor-content');
-      const chatInputContainer = document.querySelector('.chat-input-container');
+      const chatInputContainer = document.querySelector(
+        '.chat-input-container',
+      );
       console.log('Sidebar expansion check (onSummaryGenerated 2):', {
         sidebar: !!sidebar,
         editorContent: !!editorContent,
         chatInputContainer: !!chatInputContainer,
-        isHidden: sidebar?.classList.contains('hidden')
+        isHidden: sidebar?.classList.contains('hidden'),
       });
-      if (sidebar && sidebar.classList.contains('hidden')) {
+      if (sidebar?.classList.contains('hidden')) {
         console.log('Expanding sidebar after summary generation');
         sidebar.classList.remove('hidden');
         if (editorContent) editorContent.classList.remove('full-width');
@@ -3665,7 +3917,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       loadMeetingsDataFromFile().then(() => {
-        const meeting = [...upcomingMeetings, ...pastMeetings].find(m => m.id === meetingId);
+        const meeting = [...upcomingMeetings, ...pastMeetings].find(
+          (m) => m.id === meetingId,
+        );
         if (meeting) {
           // Update the AI summary in the tabbed editor
           const aiSummaryEditor = document.getElementById('ai-summary-editor');
@@ -3673,7 +3927,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             aiSummaryEditor.value = meeting.aiSummary;
 
             // Switch to summary tab to show the result
-            const summaryTab = document.querySelector('.tab-btn[data-tab="ai-summary"]');
+            const summaryTab = document.querySelector(
+              '.tab-btn[data-tab="ai-summary"]',
+            );
             if (summaryTab) {
               summaryTab.click();
             }
@@ -3716,15 +3972,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log('✅ Summary generation completed, expanding sidebar');
         const sidebar = document.getElementById('sidebar');
         const editorContent = document.querySelector('.editor-content');
-        const chatInputContainer = document.querySelector('.chat-input-container');
+        const chatInputContainer = document.querySelector(
+          '.chat-input-container',
+        );
         console.log('Sidebar elements found:', {
           sidebar: !!sidebar,
           editorContent: !!editorContent,
           chatInputContainer: !!chatInputContainer,
           isHidden: sidebar?.classList.contains('hidden'),
-          sidebarClasses: sidebar ? Array.from(sidebar.classList) : null
+          sidebarClasses: sidebar ? Array.from(sidebar.classList) : null,
         });
-        if (sidebar && sidebar.classList.contains('hidden')) {
+        if (sidebar?.classList.contains('hidden')) {
           console.log('🔧 Expanding sidebar NOW');
           sidebar.classList.remove('hidden');
           if (editorContent) editorContent.classList.remove('full-width');
@@ -3733,7 +3991,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
           console.log('⚠️ Sidebar NOT hidden or not found:', {
             exists: !!sidebar,
-            isHidden: sidebar?.classList.contains('hidden')
+            isHidden: sidebar?.classList.contains('hidden'),
           });
         }
       }
@@ -3761,7 +4019,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         `;
 
         try {
-          const hasDetectedMeeting = await window.electronAPI.checkForDetectedMeeting();
+          const hasDetectedMeeting =
+            await window.electronAPI.checkForDetectedMeeting();
           if (hasDetectedMeeting) {
             console.log('Found detected meeting, joining...');
             await window.electronAPI.joinDetectedMeeting();
@@ -3801,7 +4060,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       const deleteBtn = e.target.closest('.delete-meeting-btn');
       const meetingId = deleteBtn.dataset.id;
 
-      if (confirm('Are you sure you want to delete this note? This cannot be undone.')) {
+      if (
+        confirm(
+          'Are you sure you want to delete this note? This cannot be undone.',
+        )
+      ) {
         console.log('Deleting meeting:', meetingId);
 
         // Show loading state
@@ -3811,38 +4074,47 @@ document.addEventListener('DOMContentLoaded', async () => {
         </svg>`;
 
         // Use the main process deletion via IPC
-        window.electronAPI.deleteMeeting(meetingId)
-          .then(result => {
+        window.electronAPI
+          .deleteMeeting(meetingId)
+          .then((result) => {
             if (result.success) {
               console.log('Meeting deleted successfully on server');
 
               // After successful server deletion, update local data
               // Remove from local pastMeetings array
-              const pastMeetingIndex = pastMeetings.findIndex(meeting => meeting.id === meetingId);
+              const pastMeetingIndex = pastMeetings.findIndex(
+                (meeting) => meeting.id === meetingId,
+              );
               if (pastMeetingIndex !== -1) {
                 pastMeetings.splice(pastMeetingIndex, 1);
               }
 
               // Remove from meetingsData as well
-              const pastDataIndex = meetingsData.pastMeetings.findIndex(meeting => meeting.id === meetingId);
+              const pastDataIndex = meetingsData.pastMeetings.findIndex(
+                (meeting) => meeting.id === meetingId,
+              );
               if (pastDataIndex !== -1) {
                 meetingsData.pastMeetings.splice(pastDataIndex, 1);
               }
 
               // Also check upcomingMeetings
-              const upcomingMeetingIndex = upcomingMeetings.findIndex(meeting => meeting.id === meetingId);
+              const upcomingMeetingIndex = upcomingMeetings.findIndex(
+                (meeting) => meeting.id === meetingId,
+              );
               if (upcomingMeetingIndex !== -1) {
                 upcomingMeetings.splice(upcomingMeetingIndex, 1);
               }
 
-              const upcomingDataIndex = meetingsData.upcomingMeetings.findIndex(meeting => meeting.id === meetingId);
+              const upcomingDataIndex = meetingsData.upcomingMeetings.findIndex(
+                (meeting) => meeting.id === meetingId,
+              );
               if (upcomingDataIndex !== -1) {
                 meetingsData.upcomingMeetings.splice(upcomingDataIndex, 1);
               }
 
               // Update the grouped meetings
               pastMeetingsByDate = {};
-              meetingsData.pastMeetings.forEach(meeting => {
+              meetingsData.pastMeetings.forEach((meeting) => {
                 const dateKey = formatDateHeader(meeting.date);
                 if (!pastMeetingsByDate[dateKey]) {
                   pastMeetingsByDate[dateKey] = [];
@@ -3855,12 +4127,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else {
               // Server side deletion failed
               console.error('Server deletion failed:', result.error);
-              alert('Failed to delete note: ' + (result.error || 'Unknown error'));
+              alert(
+                `Failed to delete note: ${result.error || 'Unknown error'}`,
+              );
             }
           })
-          .catch(error => {
+          .catch((error) => {
             console.error('Error deleting meeting:', error);
-            alert('Failed to delete note: ' + (error.message || 'Unknown error'));
+            alert(`Failed to delete note: ${error.message || 'Unknown error'}`);
           })
           .finally(() => {
             // Reset button state whether success or failure
@@ -3940,7 +4214,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Handle share buttons
   const shareButtons = document.querySelectorAll('.share-btn');
-  shareButtons.forEach(button => {
+  shareButtons.forEach((button) => {
     button.addEventListener('click', () => {
       const action = button.textContent.trim();
       console.log(`Share action: ${action}`);
@@ -3950,7 +4224,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Handle AI option buttons
   const aiButtons = document.querySelectorAll('.ai-btn');
-  aiButtons.forEach(button => {
+  aiButtons.forEach((button) => {
     button.addEventListener('click', async () => {
       const action = button.textContent.trim();
       console.log(`AI action: ${action}`);
@@ -3972,20 +4246,24 @@ document.addEventListener('DOMContentLoaded', async () => {
           console.log('Starting streaming summary generation');
 
           // Log the summary generation request to the SDK logger
-          sdkLogger.log('Requesting AI summary generation for meeting: ' + currentEditingMeetingId);
+          sdkLogger.log(
+            'Requesting AI summary generation for meeting: ' +
+              currentEditingMeetingId,
+          );
 
-          window.electronAPI.generateMeetingSummaryStreaming(currentEditingMeetingId)
-            .then(result => {
+          window.electronAPI
+            .generateMeetingSummaryStreaming(currentEditingMeetingId)
+            .then((result) => {
               if (result.success) {
                 console.log('Summary generated successfully (streaming)');
               } else {
                 console.error('Failed to generate summary:', result.error);
-                alert('Failed to generate summary: ' + result.error);
+                alert(`Failed to generate summary: ${result.error}`);
               }
             })
-            .catch(error => {
+            .catch((error) => {
               console.error('Error generating summary:', error);
-              alert('Error generating summary: ' + (error.message || error));
+              alert(`Error generating summary: ${error.message || error}`);
             })
             .finally(() => {
               // Reset button state
@@ -3994,7 +4272,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         } catch (error) {
           console.error('Error starting streaming summary generation:', error);
-          alert('Error starting summary generation: ' + (error.message || error));
+          alert(`Error starting summary generation: ${error.message || error}`);
 
           // Reset button state
           button.textContent = originalText;
@@ -4023,8 +4301,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       updateRecordingButtonUI(isActive, isActive ? data.recordingId : null);
 
       // Also update the future meeting indicator if it exists
-      const futureMeetingIndicator = document.getElementById('futureMeetingIndicator');
-      if (futureMeetingIndicator && futureMeetingIndicator.style.display !== 'none') {
+      const futureMeetingIndicator = document.getElementById(
+        'futureMeetingIndicator',
+      );
+      if (
+        futureMeetingIndicator &&
+        futureMeetingIndicator.style.display !== 'none'
+      ) {
         // Re-display the meeting to update the UI
         displayMeetingInEditor(currentEditingMeetingId);
       }
@@ -4034,7 +4317,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Setup record/stop button toggle
   const recordButton = document.getElementById('recordButton');
   if (recordButton) {
-
     let isProcessing = false; // Flag to prevent double-clicks
 
     recordButton.addEventListener('click', async () => {
@@ -4060,7 +4342,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (window.isRecording) {
         try {
           // Start recording
-          console.log('Starting manual recording for meeting:', currentEditingMeetingId);
+          console.log(
+            'Starting manual recording for meeting:',
+            currentEditingMeetingId,
+          );
 
           // Change to stop mode immediately for better feedback
           recordButton.classList.add('recording');
@@ -4068,10 +4353,15 @@ document.addEventListener('DOMContentLoaded', async () => {
           stopIcon.style.display = 'block';
 
           // Call the API to start recording
-          const result = await window.electronAPI.startManualRecording(currentEditingMeetingId);
+          const result = await window.electronAPI.startManualRecording(
+            currentEditingMeetingId,
+          );
 
           if (result.success) {
-            console.log('Manual recording started with ID:', result.recordingId);
+            console.log(
+              'Manual recording started with ID:',
+              result.recordingId,
+            );
             window.currentRecordingId = result.recordingId;
 
             // Show a little toast message
@@ -4090,7 +4380,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           } else {
             // If starting failed, revert UI
             console.error('Failed to start recording:', result.error);
-            alert('Failed to start recording: ' + result.error);
+            alert(`Failed to start recording: ${result.error}`);
             window.isRecording = false;
             recordButton.classList.remove('recording');
             recordIcon.style.display = 'block';
@@ -4100,7 +4390,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (error) {
           // Handle errors
           console.error('Error starting recording:', error);
-          alert('Error starting recording: ' + (error.message || error));
+          alert(`Error starting recording: ${error.message || error}`);
 
           // Reset UI state
           window.isRecording = false;
@@ -4113,7 +4403,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Stop recording
         if (window.currentRecordingId) {
           try {
-            console.log('Stopping manual recording:', window.currentRecordingId);
+            console.log(
+              'Stopping manual recording:',
+              window.currentRecordingId,
+            );
 
             // Store the recording ID before stopping so it's available for the completion event
             window.lastRecordingId = window.currentRecordingId;
@@ -4123,7 +4416,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             recordButton.classList.remove('recording');
 
             // Switch to AI summary tab immediately
-            const summaryTabBtn = document.querySelector('.tab-btn[data-tab="ai-summary"]');
+            const summaryTabBtn = document.querySelector(
+              '.tab-btn[data-tab="ai-summary"]',
+            );
             if (summaryTabBtn) summaryTabBtn.click();
 
             // Set loading state
@@ -4131,14 +4426,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Add a safety timeout to prevent infinite spinner (30 seconds)
             summaryGenerationTimeout = setTimeout(() => {
-              console.warn('Summary generation timeout - forcing spinner to stop');
+              console.warn(
+                'Summary generation timeout - forcing spinner to stop',
+              );
               window.setRecordButtonLoading(false);
               isProcessing = false;
               summaryGenerationTimeout = null;
             }, 30000);
 
             // Call the API to stop recording
-            const result = await window.electronAPI.generateSummary(window.currentRecordingId);
+            const result = await window.electronAPI.generateSummary(
+              window.currentRecordingId,
+            );
 
             if (result.success) {
               console.log('Manual recording stopped successfully');
@@ -4159,10 +4458,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
               // The recording-completed event handler will take care of refreshing the content
               // and generating the summary when the recording finishes processing
-
             } else {
               console.error('Failed to stop recording:', result.error);
-              alert('Failed to stop recording: ' + result.error);
+              alert(`Failed to stop recording: ${result.error}`);
 
               // Clear safety timeout
               if (summaryGenerationTimeout) {
@@ -4183,7 +4481,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             isProcessing = false; // Re-enable button clicks
           } catch (error) {
             console.error('Error stopping recording:', error);
-            alert('Error stopping recording: ' + (error.message || error));
+            alert(`Error stopping recording: ${error.message || error}`);
 
             // Restore recording state on error
             window.isRecording = true;
@@ -4211,7 +4509,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (generateBtn) {
     let isGeneratingSummary = false;
     generateBtn.addEventListener('click', async () => {
-      console.log('SUMMARIZE BUTTON CLICKED - disabled:', generateBtn.disabled, 'meetingId:', currentEditingMeetingId);
+      console.log(
+        'SUMMARIZE BUTTON CLICKED - disabled:',
+        generateBtn.disabled,
+        'meetingId:',
+        currentEditingMeetingId,
+      );
 
       // Prevent concurrent summary generation
       if (isGeneratingSummary) {
@@ -4227,15 +4530,22 @@ document.addEventListener('DOMContentLoaded', async () => {
       isGeneratingSummary = true;
 
       try {
-        console.log('Getting recording ID from meeting object for:', currentEditingMeetingId);
+        console.log(
+          'Getting recording ID from meeting object for:',
+          currentEditingMeetingId,
+        );
 
         // Get recordingId from the meeting object (works for both active and completed recordings)
-        const meeting = [...upcomingMeetings, ...pastMeetings].find(m => m.id === currentEditingMeetingId);
+        const meeting = [...upcomingMeetings, ...pastMeetings].find(
+          (m) => m.id === currentEditingMeetingId,
+        );
         console.log('Found meeting:', meeting);
 
         if (!meeting || !meeting.recordingId) {
           console.log('No recordingId found for this meeting');
-          alert('No recording found for this meeting. Please start a recording first.');
+          alert(
+            'No recording found for this meeting. Please start a recording first.',
+          );
           isGeneratingSummary = false;
           return;
         }
@@ -4248,11 +4558,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.isRecording = false;
         recordButton.classList.remove('recording');
 
-        const summaryTabBtn = document.querySelector('.tab-btn[data-tab="ai-summary"]');
+        const summaryTabBtn = document.querySelector(
+          '.tab-btn[data-tab="ai-summary"]',
+        );
         console.log('Switching to AI summary tab');
         if (summaryTabBtn) summaryTabBtn.click();
 
-        console.log('Calling setRecordButtonLoading(true), function exists:', typeof window.setRecordButtonLoading);
+        console.log(
+          'Calling setRecordButtonLoading(true), function exists:',
+          typeof window.setRecordButtonLoading,
+        );
         window.setRecordButtonLoading(true);
         console.log('setRecordButtonLoading(true) completed');
 
@@ -4276,7 +4591,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           }, 3000);
         } else {
           console.error('Failed to stop recording:', result.error);
-          alert('Failed to stop recording: ' + result.error);
+          alert(`Failed to stop recording: ${result.error}`);
           window.isRecording = true;
           recordButton.classList.add('recording');
           window.setRecordButtonLoading(false);
@@ -4285,7 +4600,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.currentRecordingId = null;
       } catch (error) {
         console.error('Error stopping recording:', error);
-        alert('Error stopping recording: ' + (error.message || error));
+        alert(`Error stopping recording: ${error.message || error}`);
         window.isRecording = true;
         recordButton.classList.add('recording');
         window.setRecordButtonLoading(false);
@@ -4298,7 +4613,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Note: Removed duplicate .generate-btn listener to avoid double execution
 
   // Check authentication status and display user info (make it global)
-  window.updateAuthStatus = async function() {
+  window.updateAuthStatus = async () => {
     const loginView = document.getElementById('loginView');
     const appContainer = document.querySelector('.app-container');
 
@@ -4315,10 +4630,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (userResult.success && userResult.user) {
           // The user data might be in userResult.user.data.user structure from the API response
-          const userData = userResult.user?.data?.user || userResult.user?.user || userResult.user?.data || userResult.user;
+          const userData =
+            userResult.user?.data?.user ||
+            userResult.user?.user ||
+            userResult.user?.data ||
+            userResult.user;
           console.log('Extracted user data:', userData);
           console.log('User data type:', typeof userData);
-          console.log('User data keys:', userData ? Object.keys(userData) : 'no keys');
+          console.log(
+            'User data keys:',
+            userData ? Object.keys(userData) : 'no keys',
+          );
 
           const avatarElement = document.querySelector('.user-avatar');
 
@@ -4327,7 +4649,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             // The protobuf uses full_name (snake_case)
             // The storage now properly saves full_name from the API
             const email = userData.email || '';
-            const fullName = (userData.full_name || userData.name || userData.fullName || '').trim();
+            const fullName = (
+              userData.full_name ||
+              userData.name ||
+              userData.fullName ||
+              ''
+            ).trim();
 
             // Log to debug what we're getting
             console.log('User full_name:', userData.full_name);
@@ -4337,12 +4664,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.log('Extracted fullName:', fullName);
 
             // Make sure fullName is not accidentally set to email
-            const actualName = (fullName && fullName !== email) ? fullName : '';
+            const actualName = fullName && fullName !== email ? fullName : '';
 
             // Update avatar with user initials or image
-            const initials = actualName ?
-              actualName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) :
-              email ? email[0].toUpperCase() : 'U';
+            const initials = actualName
+              ? actualName
+                  .split(' ')
+                  .map((n) => n[0])
+                  .join('')
+                  .toUpperCase()
+                  .slice(0, 2)
+              : email
+                ? email[0].toUpperCase()
+                : 'U';
 
             // Create a better avatar display with initials
             avatarElement.innerHTML = `
@@ -4361,7 +4695,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             // Create and store new handler
-            const handleAvatarClick = function(e) {
+            const handleAvatarClick = (e) => {
               e.stopPropagation();
               e.preventDefault();
 
@@ -4403,13 +4737,15 @@ document.addEventListener('DOMContentLoaded', async () => {
               document.body.appendChild(menu);
 
               // Handle logout click
-              document.getElementById('logoutBtn').addEventListener('click', async () => {
-                if (confirm('Are you sure you want to sign out?')) {
-                  menu.remove();
-                  await window.electronAPI.auth.logout();
-                  window.updateAuthStatus();
-                }
-              });
+              document
+                .getElementById('logoutBtn')
+                .addEventListener('click', async () => {
+                  if (confirm('Are you sure you want to sign out?')) {
+                    menu.remove();
+                    await window.electronAPI.auth.logout();
+                    window.updateAuthStatus();
+                  }
+                });
 
               // Close menu when clicking outside
               setTimeout(() => {
@@ -4454,7 +4790,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (error) {
       console.error('Error checking auth status:', error);
     }
-  }
+  };
 
   // Initialize login UI handlers
   initializeLoginUI();
@@ -4486,11 +4822,15 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div class="notification-title">${data.title}</div>
           <div class="notification-body">${data.body}</div>
         </div>
-        ${data.action ? `
+        ${
+          data.action
+            ? `
           <button class="notification-action-btn" data-action="${data.type}">
             ${data.action}
           </button>
-        ` : ''}
+        `
+            : ''
+        }
       </div>
       <button class="notification-close" data-action="close">×</button>
     `;
@@ -4528,7 +4868,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.handleNotificationAction = async (type) => {
     if (type === 'meeting-detected') {
       // Check if we have a detected meeting and join it
-      const hasDetectedMeeting = await window.electronAPI.checkForDetectedMeeting();
+      const hasDetectedMeeting =
+        await window.electronAPI.checkForDetectedMeeting();
       if (hasDetectedMeeting) {
         console.log('Starting recording from notification...');
         await window.electronAPI.joinDetectedMeeting();
