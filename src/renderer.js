@@ -326,6 +326,187 @@ let pastMeetingsByDate = {};
 window.isRecording = false;
 window.currentRecordingId = null;
 
+// Home Audio Visualizer Class
+class HomeAudioVisualizer {
+  constructor() {
+    this.audioContext = null;
+    this.analyser = null;
+    this.microphone = null;
+    this.dataArray = null;
+    this.animationFrameId = null;
+    this.isActive = false;
+    this.currentMeetingId = null;
+
+    // DOM elements
+    this.visualizer = document.getElementById('homeRecordingVisualizer');
+    this.bars = document.querySelectorAll('.eq-bar');
+    this.noteTitle = document.getElementById('visualizerNoteTitle');
+  }
+
+  async start(meetingId) {
+    if (this.isActive) return;
+
+    // Store the meeting ID
+    this.currentMeetingId = meetingId;
+
+    try {
+      // Request microphone access
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+
+      // Create audio context and analyser
+      this.audioContext = new (
+        window.AudioContext || window.webkitAudioContext
+      )();
+      this.analyser = this.audioContext.createAnalyser();
+      this.analyser.fftSize = 512;
+      this.analyser.smoothingTimeConstant = 0.8;
+
+      // Connect microphone to analyser
+      this.microphone = this.audioContext.createMediaStreamSource(stream);
+      this.microphone.connect(this.analyser);
+
+      // Create data array for frequency data
+      const bufferLength = this.analyser.frequencyBinCount;
+      this.dataArray = new Uint8Array(bufferLength);
+
+      // Set note title from stored meeting ID
+      this.updateNoteTitle();
+
+      this.isActive = true;
+      this.animate();
+    } catch (error) {
+      console.error('Error starting audio visualizer:', error);
+      this.isActive = false;
+    }
+  }
+
+  stop() {
+    if (!this.isActive) return;
+
+    this.isActive = false;
+
+    // Stop animation
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
+
+    // Clean up audio context
+    if (this.microphone) {
+      this.microphone.disconnect();
+      this.microphone = null;
+    }
+
+    if (this.analyser) {
+      this.analyser.disconnect();
+      this.analyser = null;
+    }
+
+    if (this.audioContext) {
+      this.audioContext.close();
+      this.audioContext = null;
+    }
+
+    // Hide visualizer with animation
+    this.hide();
+
+    console.log('HomeAudioVisualizer stopped');
+  }
+
+  show() {
+    if (!this.isActive) {
+      return;
+    }
+
+    // Show visualizer with slide-up animation
+    this.visualizer.style.display = 'flex';
+  }
+
+  hide() {
+    // Hide visualizer with slide-down animation
+    this.visualizer.style.display = 'none';
+  }
+
+  animate() {
+    if (!this.isActive) return;
+
+    this.animationFrameId = requestAnimationFrame(() => this.animate());
+
+    // Get frequency data
+    this.analyser.getByteFrequencyData(this.dataArray);
+
+    // Update bars
+    const barCount = this.bars.length;
+    const dataPerBar = Math.floor(this.dataArray.length / barCount);
+
+    this.bars.forEach((bar, index) => {
+      // Get average frequency for this bar
+      let sum = 0;
+      for (let i = 0; i < dataPerBar; i++) {
+        sum += this.dataArray[index * dataPerBar + i];
+      }
+      const average = sum / dataPerBar;
+
+      // Convert to height (8px to 32px range)
+      const height = Math.max(8, (average / 255) * 32);
+      bar.style.height = `${height}px`;
+    });
+  }
+
+  updateNoteTitle() {
+    // Use the stored meeting ID
+    if (!this.currentMeetingId) {
+      this.noteTitle.textContent = 'Recording';
+      return;
+    }
+
+    // Find the meeting/note title in all available sources
+    const meeting =
+      [...upcomingMeetings, ...pastMeetings].find(
+        (m) => m.id === this.currentMeetingId,
+      ) ||
+      [...meetingsData.upcomingMeetings, ...meetingsData.pastMeetings].find(
+        (m) => m.id === this.currentMeetingId,
+      );
+
+    if (meeting?.title) {
+      this.noteTitle.textContent = meeting.title;
+    } else {
+      this.noteTitle.textContent = 'Recording';
+    }
+  }
+
+  showErrorState() {
+    this.visualizer.style.display = 'block';
+    this.noteTitle.textContent = 'Microphone access denied';
+
+    // Reset bar heights to minimum
+    this.bars.forEach((bar) => {
+      bar.style.height = '8px';
+    });
+  }
+
+  isOnHomePage() {
+    const homeView = document.getElementById('homeView');
+    const editorView = document.getElementById('editorView');
+    return (
+      homeView &&
+      homeView.style.display !== 'none' &&
+      editorView &&
+      editorView.style.display === 'none'
+    );
+  }
+}
+
+// Create global instance
+const homeAudioVisualizer = new HomeAudioVisualizer();
+
 // Function to check if there's an active recording for the current note
 async function checkActiveRecordingState() {
   if (!currentEditingMeetingId) return;
@@ -342,6 +523,7 @@ async function checkActiveRecordingState() {
     if (result.success && result.data) {
       console.log('Found active recording for current note:', result.data);
       updateRecordingButtonUI(true, result.data.recordingId);
+      homeAudioVisualizer.start(currentEditingMeetingId);
     } else {
       console.log('No active recording found for note');
       updateRecordingButtonUI(false, null);
@@ -363,7 +545,10 @@ function syncDisclaimerVisibility() {
     recordButton.style.display !== 'none' &&
     window.getComputedStyle(recordButton).display !== 'none';
 
-  disclaimer.style.display = isRecordButtonVisible ? 'flex' : 'none';
+  disclaimer.style.display =
+    isRecordButtonVisible && !homeAudioVisualizer.isOnHomePage()
+      ? 'flex'
+      : 'none';
 }
 
 // Function to update the recording button UI
@@ -395,6 +580,9 @@ function updateRecordingButtonUI(isActive, recordingId) {
     recordButton.classList.remove('recording');
     recordIcon.style.display = 'block';
     stopIcon.style.display = 'none';
+
+    // Stop visualizer
+    homeAudioVisualizer.stop();
   }
 
   // Sync disclaimer visibility
@@ -1404,6 +1592,8 @@ function showHomeView() {
   document.getElementById('editorView').style.display = 'none';
   document.getElementById('backButton').style.visibility = 'hidden';
   document.getElementById('toggleSidebar').style.display = 'none';
+  document.getElementById('controlButtons').style.display = 'none';
+  document.getElementById('recordingDisclaimer').style.display = 'none';
 
   // Hide the meeting sidebar
   const sidebar = document.getElementById('meetingSidebar');
@@ -1424,6 +1614,17 @@ function showHomeView() {
     recordMeetingBtn.style.display = 'block';
     updateRecordButtonState();
   }
+
+  // Show visualizer if recording is active
+  if (window.isRecording && homeAudioVisualizer.isActive) {
+    homeAudioVisualizer.show();
+  } else {
+    // Make sure visualizer is hidden if no recording
+    const visualizer = document.getElementById('homeRecordingVisualizer');
+    if (visualizer) {
+      visualizer.style.display = 'none';
+    }
+  }
 }
 
 // Function to show editor view
@@ -1437,6 +1638,10 @@ function showEditorView(meetingId, isFutureMeeting = false) {
   document.getElementById('editorView').style.display = 'block';
   document.getElementById('backButton').style.visibility = 'visible';
   document.getElementById('toggleSidebar').style.display = 'none'; // Hide the old sidebar toggle
+  document.getElementById('controlButtons').style.display = 'flex';
+
+  // Hide visualizer when leaving home page (keep audio running)
+  homeAudioVisualizer.hide();
 
   // Always hide the record meeting button when in editor view
   const recordMeetingBtn = document.getElementById('recordMeetingBtn');
@@ -2419,6 +2624,7 @@ async function loadMeetingsDataFromFile() {
   console.log('Loading meetings data from file...');
   try {
     const result = await window.electronAPI.loadMeetingsData();
+
     console.log('Load result success:', result.success);
 
     if (result.success) {
@@ -3490,6 +3696,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Listen for calendar sync events
   window.electronAPI.calendar.onCalendarSynced((meetings) => {
     console.log('Calendar synced with', meetings.length, 'meetings');
+
     calendarMeetings = meetings;
     renderMeetings();
   });
@@ -3782,11 +3989,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const meeting = [...upcomingMeetings, ...pastMeetings].find(
           (m) => m.id === meetingId,
         );
-        if (
-          meeting &&
-          meeting.participants &&
-          meeting.participants.length > 0
-        ) {
+        if (meeting?.participants?.length > 0) {
           // Log the latest participant
           const latestParticipant =
             meeting.participants[meeting.participants.length - 1];
@@ -3797,7 +4000,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
           // Show notification about new participant if debug panel is closed
           const debugPanel = document.getElementById('debugPanel');
-          if (debugPanel && debugPanel.classList.contains('hidden')) {
+          if (debugPanel?.classList.contains('hidden')) {
             const debugPanelToggle =
               document.getElementById('debugPanelToggle');
             if (debugPanelToggle) {
@@ -3841,7 +4044,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const meeting = [...upcomingMeetings, ...pastMeetings].find(
           (m) => m.id === meetingId,
         );
-        if (meeting && meeting.transcript && meeting.transcript.length > 0) {
+        if (meeting?.transcript?.length > 0) {
           // Log the latest transcript entry
           const latestEntry = meeting.transcript[meeting.transcript.length - 1];
           console.log(
@@ -3856,7 +4059,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
           // Show notification about new transcript if debug panel is closed
           const debugPanel = document.getElementById('debugPanel');
-          if (debugPanel && debugPanel.classList.contains('hidden')) {
+          if (debugPanel?.classList.contains('hidden')) {
             const debugPanelToggle =
               document.getElementById('debugPanelToggle');
             if (debugPanelToggle) {
@@ -4152,6 +4355,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const card = e.target.closest('.meeting-card, .meeting-card-with-time');
     if (card) {
       const meetingId = card.dataset.id;
+
       showEditorView(meetingId);
     }
   });
@@ -4331,6 +4535,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log('Recording action already in progress, ignoring click');
         return;
       }
+
       isProcessing = true;
 
       window.isRecording = !window.isRecording;
@@ -4363,6 +4568,11 @@ document.addEventListener('DOMContentLoaded', async () => {
               result.recordingId,
             );
             window.currentRecordingId = result.recordingId;
+
+            // Start the audio visualizer
+            homeAudioVisualizer.start(currentEditingMeetingId).catch((err) => {
+              console.error('Failed to start visualizer:', err);
+            });
 
             // Show a little toast message
             const toast = document.createElement('div');
@@ -4414,6 +4624,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Update recording state immediately
             window.isRecording = false;
             recordButton.classList.remove('recording');
+
+            // Stop the audio visualizer
+            homeAudioVisualizer.stop();
 
             // Switch to AI summary tab immediately
             const summaryTabBtn = document.querySelector(
@@ -4885,4 +5098,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       alert('Test action clicked!');
     }
   };
+
+  // Add click handler for home recording visualizer
+  const homeRecordingVisualizer = document.getElementById(
+    'homeRecordingVisualizer',
+  );
+
+  if (homeRecordingVisualizer) {
+    homeRecordingVisualizer.addEventListener('click', () => {
+      showEditorView(homeAudioVisualizer.currentMeetingId);
+    });
+  }
 });
