@@ -17,11 +17,13 @@ export class TranscriptService {
       return '';
     }
 
-    return this.currentTranscript.map(entry => {
-      const speaker = entry.speaker || 'Unknown Speaker';
-      const text = entry.text || '';
-      return `${speaker}: ${text}`;
-    }).join('\n\n');
+    return this.currentTranscript
+      .map((entry) => {
+        const speaker = entry.speaker || 'Unknown Speaker';
+        const text = entry.text || '';
+        return `${speaker}: ${text}`;
+      })
+      .join('\n\n');
   }
 
   async copyToClipboard() {
@@ -62,8 +64,11 @@ export class TranscriptService {
       return;
     }
 
-    const defaultFilename = filename || `transcript-${new Date().toISOString().slice(0, 10)}.txt`;
-    const blob = new Blob([cleanTranscript], { type: 'text/plain;charset=utf-8' });
+    const defaultFilename =
+      filename || `transcript-${new Date().toISOString().slice(0, 10)}.txt`;
+    const blob = new Blob([cleanTranscript], {
+      type: 'text/plain;charset=utf-8',
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;

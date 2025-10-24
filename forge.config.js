@@ -4,18 +4,21 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
   packagerConfig: {
     asar: {
-      unpackDir: "node_modules/@recallai"
+      unpack: '{node_modules/@recallai/**,node_modules/google-auth-library/**,node_modules/googleapis/**,node_modules/gaxios/**,node_modules/gcp-metadata/**,node_modules/gtoken/**,node_modules/jws/**,node_modules/jwa/**}',
     },
     osxSign: false, // Disabled - will need proper signing for notifications
-    icon: './muesli',
+    icon: './muesli.icns',
     extendInfo: {
-      NSUserNotificationAlertStyle: "alert",
-    }
+      NSUserNotificationAlertStyle: 'alert',
+    },
   },
   rebuildConfig: {},
   makers: [
     {
-      name: '@electron-forge/maker-dmg'
+      name: '@electron-forge/maker-dmg',
+      config: {
+        name: 'Nex Meeting Recorder',
+      },
     },
     // {
     //   name: '@electron-forge/maker-squirrel',
@@ -42,7 +45,8 @@ module.exports = {
     {
       name: '@electron-forge/plugin-webpack',
       config: {
-        devContentSecurityPolicy: "default-src * 'unsafe-inline' 'unsafe-eval' data: blob: filesystem: mediastream: file:;",
+        devContentSecurityPolicy:
+          "default-src * 'unsafe-inline' 'unsafe-eval' data: blob: filesystem: mediastream: file:;",
         mainConfig: './webpack.main.config.js',
         renderer: {
           config: './webpack.renderer.config.js',
@@ -62,11 +66,11 @@ module.exports = {
       },
     },
     {
-      name: "@timfish/forge-externals-plugin",
+      name: '@timfish/forge-externals-plugin',
       config: {
-        externals: ["@recallai/desktop-sdk"],
-        includeDeps: true
-      }
+        externals: ['@recallai/desktop-sdk', 'google-auth-library', 'googleapis'],
+        includeDeps: true,
+      },
     },
     // Fuses are used to enable/disable various Electron functionality
     // at package time, before code signing the application

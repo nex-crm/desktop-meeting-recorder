@@ -28,14 +28,16 @@ class NexAuthService extends EventEmitter {
         this.googleOAuth = new GoogleOAuthService(
           clientId,
           clientSecret,
-          process.env.GOOGLE_REDIRECT_URI
+          process.env.GOOGLE_REDIRECT_URI,
         );
         console.log('Google OAuth initialized successfully');
       } catch (error) {
         console.error('Failed to initialize Google OAuth:', error);
       }
     } else {
-      console.warn('Google OAuth credentials not found in environment variables');
+      console.warn(
+        'Google OAuth credentials not found in environment variables',
+      );
     }
   }
 
@@ -55,8 +57,10 @@ class NexAuthService extends EventEmitter {
       retries: constants.API.RETRY_ATTEMPTS,
       retryDelay: axiosRetry.exponentialDelay,
       retryCondition: (error) => {
-        return axiosRetry.isNetworkOrIdempotentRequestError(error) ||
-          (error.response && error.response.status === 429);
+        return (
+          axiosRetry.isNetworkOrIdempotentRequestError(error) ||
+          (error.response && error.response.status === 429)
+        );
       },
     });
 
@@ -88,7 +92,7 @@ class NexAuthService extends EventEmitter {
         }
 
         return Promise.reject(error);
-      }
+      },
     );
 
     return client;
@@ -101,7 +105,10 @@ class NexAuthService extends EventEmitter {
         email: email,
       });
 
-      console.log('Email auth response:', JSON.stringify(response.data, null, 2));
+      console.log(
+        'Email auth response:',
+        JSON.stringify(response.data, null, 2),
+      );
 
       // Return the attempt data for OTP verification
       return response.data;
@@ -122,24 +129,37 @@ class NexAuthService extends EventEmitter {
         code: code,
       });
 
-      console.log('OTP submission response:', JSON.stringify(response.data, null, 2));
+      console.log(
+        'OTP submission response:',
+        JSON.stringify(response.data, null, 2),
+      );
 
       // Extract tokens from the response
-      const authData = response.data.auth || response.data.data?.auth || response.data;
+      const authData =
+        response.data.auth || response.data.data?.auth || response.data;
       const tokens = authData.tokens || [];
       console.log('Extracted tokens array:', tokens);
 
       // Find tokens by type - handle both string and numeric types
-      const accessToken = tokens.find(t => t.type === 'TYPE_ACCESS' || t.type === 1)?.token;
-      const refreshToken = tokens.find(t => t.type === 'TYPE_REFRESH' || t.type === 2)?.token;
+      const accessToken = tokens.find(
+        (t) => t.type === 'TYPE_ACCESS' || t.type === 1,
+      )?.token;
+      const refreshToken = tokens.find(
+        (t) => t.type === 'TYPE_REFRESH' || t.type === 2,
+      )?.token;
 
       if (!accessToken || !refreshToken) {
-        console.error('No access or refresh token found in response:', response.data);
+        console.error(
+          'No access or refresh token found in response:',
+          response.data,
+        );
         throw new Error('Failed to obtain tokens');
       }
 
       // Calculate expires_in from the access token expiry
-      const accessTokenData = tokens.find(t => t.type === 'TYPE_ACCESS' || t.type === 1);
+      const accessTokenData = tokens.find(
+        (t) => t.type === 'TYPE_ACCESS' || t.type === 1,
+      );
       let expiresIn = 3600; // Default 1 hour
       if (accessTokenData?.expiresAt) {
         const expiryTime = new Date(accessTokenData.expiresAt).getTime();
@@ -172,7 +192,9 @@ class NexAuthService extends EventEmitter {
 
   async authenticateWithGoogle() {
     if (!this.googleOAuth) {
-      throw new Error('Google OAuth is not initialized. Please check your environment variables.');
+      throw new Error(
+        'Google OAuth is not initialized. Please check your environment variables.',
+      );
     }
 
     console.log('Starting Google One Tap authentication...');
@@ -190,19 +212,28 @@ class NexAuthService extends EventEmitter {
       });
 
       // Extract tokens from the response
-      const authData = response.data.auth || response.data.data?.auth || response.data;
+      const authData =
+        response.data.auth || response.data.data?.auth || response.data;
       const nexTokens = authData.tokens || [];
 
       // Find tokens by type
-      const accessToken = nexTokens.find(t => t.type === 'TYPE_ACCESS' || t.type === 1)?.token;
-      const refreshToken = nexTokens.find(t => t.type === 'TYPE_REFRESH' || t.type === 2)?.token;
+      const accessToken = nexTokens.find(
+        (t) => t.type === 'TYPE_ACCESS' || t.type === 1,
+      )?.token;
+      const refreshToken = nexTokens.find(
+        (t) => t.type === 'TYPE_REFRESH' || t.type === 2,
+      )?.token;
 
       if (!accessToken || !refreshToken) {
-        throw new Error('Failed to obtain Nex tokens from Google authentication');
+        throw new Error(
+          'Failed to obtain Nex tokens from Google authentication',
+        );
       }
 
       // Calculate expires_in
-      const accessTokenData = nexTokens.find(t => t.type === 'TYPE_ACCESS' || t.type === 1);
+      const accessTokenData = nexTokens.find(
+        (t) => t.type === 'TYPE_ACCESS' || t.type === 1,
+      );
       let expiresIn = 3600;
       if (accessTokenData?.expiresAt) {
         const expiryTime = new Date(accessTokenData.expiresAt).getTime();
@@ -260,19 +291,26 @@ class NexAuthService extends EventEmitter {
       });
 
       // Extract tokens from the response - handle both wrapped and unwrapped responses
-      const authData = response.data.auth || response.data.data?.auth || response.data;
+      const authData =
+        response.data.auth || response.data.data?.auth || response.data;
       const authTokens = authData.tokens || [];
 
       // Find tokens by type - handle both string and numeric types
-      const accessToken = authTokens.find(t => t.type === 'TYPE_ACCESS' || t.type === 1)?.token;
-      const refreshToken = authTokens.find(t => t.type === 'TYPE_REFRESH' || t.type === 2)?.token || tokens.refreshToken;
+      const accessToken = authTokens.find(
+        (t) => t.type === 'TYPE_ACCESS' || t.type === 1,
+      )?.token;
+      const refreshToken =
+        authTokens.find((t) => t.type === 'TYPE_REFRESH' || t.type === 2)
+          ?.token || tokens.refreshToken;
 
       if (!accessToken) {
         throw new Error('Invalid token response');
       }
 
       // Calculate expires_in from the access token expiry
-      const accessTokenData = authTokens.find(t => t.type === 'TYPE_ACCESS' || t.type === 1);
+      const accessTokenData = authTokens.find(
+        (t) => t.type === 'TYPE_ACCESS' || t.type === 1,
+      );
       let expiresIn = 3600; // Default 1 hour
       if (accessTokenData?.expiresAt) {
         const expiryTime = new Date(accessTokenData.expiresAt).getTime();
@@ -280,11 +318,7 @@ class NexAuthService extends EventEmitter {
         expiresIn = Math.floor((expiryTime - now) / 1000);
       }
 
-      this.storage.setTokens(
-        accessToken,
-        refreshToken,
-        expiresIn
-      );
+      this.storage.setTokens(accessToken, refreshToken, expiresIn);
 
       this.setupTokenRefresh();
 
@@ -304,7 +338,11 @@ class NexAuthService extends EventEmitter {
     try {
       const response = await this.apiClient.get('/v1/user');
       // The response might be wrapped in data.data or data.user structure
-      const user = response.data?.data?.user || response.data?.user || response.data?.data || response.data;
+      const user =
+        response.data?.data?.user ||
+        response.data?.user ||
+        response.data?.data ||
+        response.data;
 
       console.log('User profile response:', response.data);
       console.log('Extracted user:', user);
@@ -322,8 +360,13 @@ class NexAuthService extends EventEmitter {
       console.error('Failed to fetch user profile:', error);
 
       // If we failed to get user profile, clear auth and throw
-      if (error.response?.status === 401 || error.message?.includes('re-authentication required')) {
-        console.log('User profile fetch failed with 401 or invalid data, clearing auth...');
+      if (
+        error.response?.status === 401 ||
+        error.message?.includes('re-authentication required')
+      ) {
+        console.log(
+          'User profile fetch failed with 401 or invalid data, clearing auth...',
+        );
         this.storage.clearAuth();
       }
 
@@ -343,12 +386,20 @@ class NexAuthService extends EventEmitter {
       let workspaces = [];
 
       // Check if response has memberships array (workspace membership structure)
-      if (responseData?.memberships && Array.isArray(responseData.memberships)) {
+      if (
+        responseData?.memberships &&
+        Array.isArray(responseData.memberships)
+      ) {
         // Extract workspace from each membership
-        workspaces = responseData.memberships.map(m => m.workspace).filter(w => w);
+        workspaces = responseData.memberships
+          .map((m) => m.workspace)
+          .filter((w) => w);
       }
       // Or direct workspaces array
-      else if (responseData?.workspaces && Array.isArray(responseData.workspaces)) {
+      else if (
+        responseData?.workspaces &&
+        Array.isArray(responseData.workspaces)
+      ) {
         workspaces = responseData.workspaces;
       }
       // Or response data itself is the workspaces array
@@ -365,7 +416,9 @@ class NexAuthService extends EventEmitter {
       const workspace = workspaces[0];
       this.storage.setWorkspace(workspace);
 
-      console.log(`Stored workspace: ${workspace.name} (${workspace.slug || workspace.handle})`);
+      console.log(
+        `Stored workspace: ${workspace.name} (${workspace.slug || workspace.handle})`,
+      );
 
       return workspace;
     } catch (error) {
@@ -377,7 +430,9 @@ class NexAuthService extends EventEmitter {
 
   async fetchWorkspaceInfo(workspaceSlug) {
     try {
-      const response = await this.apiClient.get(`/v1/workspaces/${workspaceSlug}`);
+      const response = await this.apiClient.get(
+        `/v1/workspaces/${workspaceSlug}`,
+      );
       this.storage.setWorkspace(response.data);
       return response.data;
     } catch (error) {
@@ -431,13 +486,21 @@ class NexAuthService extends EventEmitter {
 
     // Check if we have user data stored
     const storedUser = this.storage.getUser();
-    if (!storedUser || (!storedUser.email && !storedUser.user_id && !storedUser.userId)) {
-      console.log('No valid user data found in storage, attempting to fetch...');
+    if (
+      !storedUser ||
+      (!storedUser.email && !storedUser.user_id && !storedUser.userId)
+    ) {
+      console.log(
+        'No valid user data found in storage, attempting to fetch...',
+      );
       try {
         await this.fetchUserProfile();
       } catch (error) {
         console.error('Failed to fetch user profile during validation:', error);
-        return { isValid: false, reason: 'No valid user data - re-authentication required' };
+        return {
+          isValid: false,
+          reason: 'No valid user data - re-authentication required',
+        };
       }
     }
 

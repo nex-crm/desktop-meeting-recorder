@@ -8,6 +8,7 @@ module.exports = [
   },
   {
     test: /[/\\]node_modules[/\\].+\.(m?js|node)$/,
+    exclude: /node_modules\/(google-auth-library|googleapis|gaxios|gcp-metadata|gtoken|jws|jwa)/,
     parser: { amd: false },
     use: {
       loader: '@vercel/webpack-asset-relocator-loader',

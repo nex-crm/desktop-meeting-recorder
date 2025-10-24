@@ -1882,7 +1882,7 @@ function initSDK() {
         `Cleaning up calendar recording tracking for: ${evt.window.id}`,
       );
       const recording = activeCalendarRecordings.get(evt.window.id);
-      if (recording && recording.pollInterval) {
+      if (recording?.pollInterval) {
         clearInterval(recording.pollInterval);
       }
       activeCalendarRecordings.delete(evt.window.id);
@@ -2043,9 +2043,11 @@ function initSDK() {
             windowId: evt.window.id,
           });
 
-          RecallAiSdk.uploadRecording({
+          const uploadResponse = await RecallAiSdk.uploadRecording({
             windowId: evt.window.id,
           });
+
+          console.log(uploadResponse);
           console.log(
             '[UPLOAD] Upload initiated with SDK for file:',
             foundFilePath,
@@ -2081,6 +2083,8 @@ function initSDK() {
 
     // When upload completes, fetch the video URL from Recall
     if (progress === 100) {
+      console.log('progress event 100%', evt);
+
       console.log(
         `[UPLOAD COMPLETE] Upload completed for recording: ${window.id}`,
       );
@@ -2102,7 +2106,7 @@ function initSDK() {
             meetingsArray = meetingsData.upcomingMeetings;
           }
 
-          if (meeting && meeting.calendarEventId) {
+          if (meeting?.calendarEventId) {
             console.log(
               `[UPLOAD COMPLETE] Fetching video URL from API for meeting: ${meeting.calendarEventId}`,
             );
