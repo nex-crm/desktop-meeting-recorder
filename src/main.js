@@ -29,7 +29,7 @@ let calendarService;
 function getHeaderLines() {
   return [
     'HTTP-Referer: https://recall.ai', // Replace with your actual app's URL
-    'X-Title: Muesli AI Notetaker',
+    'X-Title: Nex Meeting Recorder',
   ];
 }
 
@@ -39,7 +39,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENROUTER_KEY,
   defaultHeaders: {
     'HTTP-Referer': 'https://recall.ai',
-    'X-Title': 'Muesli AI Notetaker',
+    'X-Title': 'Nex Meeting Recorder',
   },
 });
 
@@ -723,8 +723,6 @@ app.whenReady().then(async () => {
     calendarService.initialize().catch((error) => {
       console.error('Failed to initialize calendar sync after auth:', error);
     });
-    // Initialize SDK after successful authentication
-    initSDK();
   });
 
   authService.on('auth:logout', () => {
@@ -948,6 +946,10 @@ app.whenReady().then(async () => {
     return process.env.SHOW_DEBUG_PANEL === 'true';
   });
 
+  // Initialize the Recall.ai SDK on startup (doesn't require authentication)
+  // This ensures the SDK is ready for recording operations regardless of auth state
+  initSDK();
+
   // Create the main window first so it can handle protocol callbacks
   createWindow();
 
@@ -957,7 +959,6 @@ app.whenReady().then(async () => {
   if (!isAuthenticated) {
     // The renderer will handle showing the login UI
     console.log('User not authenticated - login UI will be shown');
-    // Don't initialize SDK yet - wait for successful authentication
   } else {
     // We have tokens, but let's validate the session and check for user data
     console.log('Validating existing session...');
@@ -972,8 +973,6 @@ app.whenReady().then(async () => {
       // The renderer will handle showing the login UI
     } else {
       console.log('Session is valid');
-      // Initialize SDK for valid session
-      initSDK();
     }
   }
 
@@ -1531,11 +1530,6 @@ function initSDK() {
       recording_path: RECORDING_PATH,
     },
   });
-
-  // Helper function to send in-app notification - removed, using custom notification window instead
-  const sendInAppNotification = (platformName) => {
-    // No longer used - custom notification window handles all notifications
-  };
 
   // Check if a detected meeting window is part of a calendar meeting
   const checkIfMeetingIsOnCalendar = (meetingWindow) => {

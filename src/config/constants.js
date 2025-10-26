@@ -1,7 +1,7 @@
 const path = require('path');
 
 module.exports = {
-  APP_NAME: 'Nex Desktop Meeting Recorder',
+  APP_NAME: 'Nex Meeting Recorder',
 
   API: {
     BASE_URL: process.env.NEX_API_URL || 'https://api.nex.ai',

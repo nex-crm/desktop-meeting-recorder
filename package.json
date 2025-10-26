@@ -1,6 +1,6 @@
 {
 	"name": "desktop-meeting-recorder",
-	"productName": "Nex Desktop Meeting Recorder",
+	"productName": "Nex Meeting Recorder",
 	"version": "0.1.0",
 	"description": "Nex CRM desktop meeting recorder using Recall.ai SDK",
 	"main": ".webpack/main",

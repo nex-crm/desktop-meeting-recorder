@@ -1,4 +1,4 @@
-# Nex Desktop Meeting Recorder
+# Nex Meeting Recorder
 
 A desktop application for recording meetings locally using the Recall.ai Desktop SDK. This provides a discreet, universal solution for meeting recording that works across all meeting platforms.
 

@@ -4,10 +4,11 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
   packagerConfig: {
     asar: {
-      unpack: '{node_modules/@recallai/**,node_modules/google-auth-library/**,node_modules/googleapis/**,node_modules/gaxios/**,node_modules/gcp-metadata/**,node_modules/gtoken/**,node_modules/jws/**,node_modules/jwa/**}',
+      unpack:
+        '{node_modules/@recallai/**,node_modules/google-auth-library/**,node_modules/googleapis/**,node_modules/gaxios/**,node_modules/gcp-metadata/**,node_modules/gtoken/**,node_modules/jws/**,node_modules/jwa/**}',
     },
     osxSign: false, // Disabled - will need proper signing for notifications
-    icon: './muesli.icns',
+    icon: './nex-logo.icns',
     extendInfo: {
       NSUserNotificationAlertStyle: 'alert',
     },
@@ -68,7 +69,11 @@ module.exports = {
     {
       name: '@timfish/forge-externals-plugin',
       config: {
-        externals: ['@recallai/desktop-sdk', 'google-auth-library', 'googleapis'],
+        externals: [
+          '@recallai/desktop-sdk',
+          'google-auth-library',
+          'googleapis',
+        ],
         includeDeps: true,
       },
     },
